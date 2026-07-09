@@ -41,7 +41,7 @@ Napi::Value Matcher::Match(const Napi::CallbackInfo &info)
       options.num_threads = options_obj.Get("numThreads").ToNumber().Uint32Value();
       options.max_results = options_obj.Get("maxResults").ToNumber().Uint32Value();
       options.max_gap = options_obj.Get("maxGap").ToNumber().Uint32Value();
-      options.record_match_indexes = options_obj.Get("recordMatchIndexes");
+      options.record_match_indexes = options_obj.Get("recordMatchIndexes").ToBoolean();
       options.fuzzaldrin = options_obj.Get("algorithm").ToString().Utf8Value() == "fuzzaldrin";
       options.root_path = options_obj.Get("rootPath").ToString();
     }
