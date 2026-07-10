@@ -56,6 +56,10 @@ public:
     uint32_t id;
     std::string value;
     std::string lowercase;
+    // Lowercase, diacritic-free ASCII fold of `value`. Only populated when the
+    // matcher was created with ignoreDiacritics; used in place of `lowercase`
+    // (and `value`) for scoring in that mode.
+    std::string folded;
     int num_dirs;
     /**
      * A bitmask representing the counts of letters a-z contained in the string.
@@ -84,6 +88,13 @@ public:
   void reserve(size_t n);
   size_t size() const;
 
+  // When enabled, candidates and queries are folded to a lowercase,
+  // diacritic-free ASCII form before matching, so "cafe" matches "café".
+  // Must be set before candidates are added; it governs how each candidate's
+  // folded form is precomputed in addCandidate().
+  void setIgnoreDiacritics(bool value) { ignore_diacritics_ = value; }
+  bool ignoreDiacritics() const { return ignore_diacritics_; }
+
 private:
   // Storing candidate data in an array makes table scans significantly faster.
   // This makes add/remove slightly more expensive, but in our case queries
@@ -91,4 +102,5 @@ private:
   std::vector<CandidateData> candidates_;
   std::unordered_map<uint32_t, size_t> lookup_;
   std::string lastQuery_;
+  bool ignore_diacritics_ = false;
 };

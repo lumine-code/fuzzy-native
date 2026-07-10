@@ -23,6 +23,7 @@
         'src/fuzzaldrin_score.cpp',
         'src/score_match.cpp',
         'src/MatcherBase.cpp',
+        'src/diacritics.cpp',
       ],
       'conditions': [
         ['OS == "win"', {

@@ -1,4 +1,5 @@
 #include "MatcherBase.h"
+#include "diacritics.h"
 #include "fuzzaldrin_score.h"
 #include "score_match.h"
 
@@ -96,16 +97,33 @@ void push_heap(ResultHeap &heap, float score, int score_based_root_path,
 }
 
 vector<MatchResult> finalize(const string &query, const string &query_case,
-                             const MatchOptions &options,
+                             const MatchOptions &options, bool ignore_diacritics,
                              bool record_match_indexes, ResultHeap &&heap) {
   vector<MatchResult> vec;
   while (heap.size()) {
     const MatchResult &result = heap.top();
     if (record_match_indexes) {
       result.matchIndexes.reset(new vector<int>(query.size()));
-      string lower = str_to_lower(*result.value);
-      score_match(result.value->c_str(), lower.c_str(), query.c_str(),
-                  query_case.c_str(), options, 0.0, result.matchIndexes.get());
+      if (ignore_diacritics) {
+        // Score against the folded value to find match positions, then map
+        // each folded byte offset back to a UTF-16 offset in the original
+        // value so callers can highlight the accented display text correctly.
+        vector<int> pos_map;
+        string folded = fold_diacritics(*result.value, &pos_map);
+        score_match(folded.c_str(), folded.c_str(), query.c_str(),
+                    query_case.c_str(), options, 0.0,
+                    result.matchIndexes.get());
+        for (int &idx : *result.matchIndexes) {
+          if (idx >= 0 && idx < (int)pos_map.size()) {
+            idx = pos_map[idx];
+          }
+        }
+      } else {
+        string lower = str_to_lower(*result.value);
+        score_match(result.value->c_str(), lower.c_str(), query.c_str(),
+                    query_case.c_str(), options, 0.0,
+                    result.matchIndexes.get());
+      }
     }
     vec.push_back(result);
     heap.pop();
@@ -115,8 +133,9 @@ vector<MatchResult> finalize(const string &query, const string &query_case,
 }
 
 void thread_worker(const string &query, const string &query_case,
-                   const MatchOptions &options, bool use_last_match,
-                   std::atomic<float> *min_score, size_t max_results,
+                   const MatchOptions &options, bool ignore_diacritics,
+                   bool use_last_match, std::atomic<float> *min_score,
+                   size_t max_results,
                    vector<MatcherBase::CandidateData> &candidates, size_t start,
                    size_t end, ResultHeap &result) {
   uint64_t bitmask = letter_bitmask(query_case.c_str());
@@ -126,16 +145,23 @@ void thread_worker(const string &query, const string &query_case,
       continue;
     }
     if ((bitmask & candidate.bitmask) == bitmask) {
+      // In diacritic-insensitive mode the folded form is the string we score
+      // against (both the "original" and the case-folded haystack), and the
+      // query is already folded.
+      const string &haystack =
+          ignore_diacritics ? candidate.folded : candidate.value;
+      const string &haystack_case =
+          ignore_diacritics ? candidate.folded : candidate.lowercase;
       float score;
       if (query == "") {
         score = 1;
       } else if (options.fuzzaldrin) {
-        score = fuzzaldrin_score(candidate.value, query);
-        score = fuzzaldrin_basename_score(candidate.value, query, score);
+        score = fuzzaldrin_score(haystack, query);
+        score = fuzzaldrin_basename_score(haystack, query, score);
       } else {
-        score = score_match(candidate.value.c_str(),
-                            candidate.lowercase.c_str(), query.c_str(),
-                            query_case.c_str(), options, min_score->load());
+        score = score_match(haystack.c_str(), haystack_case.c_str(),
+                            query.c_str(), query_case.c_str(), options,
+                            min_score->load());
       }
       if (score > 0) {
         push_heap(result, score, score_based_root_path(options, candidate),
@@ -185,7 +211,13 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   }
 
   string query_case;
-  if (!options.case_sensitive) {
+  if (ignore_diacritics_) {
+    // Fold the query the same way candidates were folded. The folded query is
+    // used as both the needle and its case form, since the folded haystack is
+    // already lowercase ASCII.
+    new_query = fold_diacritics(new_query);
+    query_case = new_query;
+  } else if (!options.case_sensitive) {
     query_case = str_to_lower(new_query);
   } else {
     query_case = query;
@@ -199,9 +231,9 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   ResultHeap combined;
   std::atomic<float> min_score(0);
   if (num_threads == 0 || candidates_.size() < 10000) {
-    thread_worker(new_query, query_case, matchOptions, use_last_match,
-                  &min_score, max_results, candidates_, 0, candidates_.size(),
-                  combined);
+    thread_worker(new_query, query_case, matchOptions, ignore_diacritics_,
+                  use_last_match, &min_score, max_results, candidates_, 0,
+                  candidates_.size(), combined);
   } else {
     vector<ResultHeap> thread_results(num_threads);
     vector<thread> threads;
@@ -213,8 +245,8 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
         chunk_size++;
       }
       threads.emplace_back(thread_worker, ref(new_query), ref(query_case),
-                           ref(matchOptions), use_last_match, &min_score,
-                           max_results, ref(candidates_), cur_start,
+                           ref(matchOptions), ignore_diacritics_, use_last_match,
+                           &min_score, max_results, ref(candidates_), cur_start,
                            cur_start + chunk_size, ref(thread_results[i]));
       cur_start += chunk_size;
     }
@@ -230,22 +262,28 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     }
   }
 
-  return finalize(new_query, query_case, matchOptions,
+  return finalize(new_query, query_case, matchOptions, ignore_diacritics_,
                   options.record_match_indexes, std::move(combined));
 }
 
 void MatcherBase::addCandidate(uint32_t id, const string &candidate) {
   auto it = lookup_.find(id);
   if (it == lookup_.end()) {
-    string lowercase = str_to_lower(candidate);
     lookup_[id] = candidates_.size();
     CandidateData data;
     data.id = id;
     data.value = candidate;
-    data.bitmask = letter_bitmask(lowercase.c_str());
-    data.lowercase = std::move(lowercase);
     data.last_match = true;
     data.num_dirs = num_dirs(candidate);
+    if (ignore_diacritics_) {
+      // Match against the folded form; the bitmask is derived from it too.
+      data.folded = fold_diacritics(candidate);
+      data.bitmask = letter_bitmask(data.folded.c_str());
+    } else {
+      string lowercase = str_to_lower(candidate);
+      data.bitmask = letter_bitmask(lowercase.c_str());
+      data.lowercase = std::move(lowercase);
+    }
     candidates_.emplace_back(std::move(data));
   }
 }

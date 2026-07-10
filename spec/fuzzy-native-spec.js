@@ -301,11 +301,78 @@ describe('fuzzy-native', function() {
     expect(() => matcher.addCandidates([1, 2], ["a", "b", "c"])).toThrow(expectedMessage)
   });
 
+  it('throws (rather than crashing) on non-string candidates or non-number ids', () => {
+    // With C++ exceptions disabled, converting the wrong type used to abort the
+    // whole process; these must raise catchable JS errors instead.
+    expect(() => matcher.addCandidates([0], [{}])).toThrow(
+      'Expected second array to only contain strings'
+    );
+    expect(() => matcher.addCandidates([0], [123])).toThrow(
+      'Expected second array to only contain strings'
+    );
+    expect(() => matcher.addCandidates(['x'], ['a'])).toThrow(
+      'Expected first array to only contain unsigned 32-bit integer ids'
+    );
+    expect(() => matcher.removeCandidates([{}])).toThrow(
+      'Expected array to only contain unsigned 32-bit integer ids'
+    );
+    // The matcher is still usable afterwards.
+    matcher.setCandidates([0, 1], ['abc', 'abd']);
+    expect(values(matcher.match('abc'))).toEqual(['abc']);
+  });
+
   it('returns match results for duplicate values with different ids', () => {
     matcher.setCandidates([0, 1], ['abc', 'abc']);
     expect(matcher.match('ac').length).toBe(2);
     matcher.setCandidates([0, 0], ['abc', 'abc']);
     expect(matcher.match('ac').length).toBe(1);
+  });
+
+  describe('ignoreDiacritics', () => {
+    it('matches accented candidates with an unaccented query', () => {
+      const m = new fuzzyNative.Matcher(
+        ...genIds(['café', 'cafeteria', 'Málaga', 'random']),
+        { ignoreDiacritics: true }
+      );
+      expect(values(m.match('cafe')).sort()).toEqual(['cafeteria', 'café']);
+      expect(values(m.match('malaga'))).toEqual(['Málaga']);
+    });
+
+    it('folds expanding characters like ß -> ss', () => {
+      const m = new fuzzyNative.Matcher(
+        ...genIds(['Straße', 'strasse-other']),
+        { ignoreDiacritics: true }
+      );
+      expect(values(m.match('strasse')).sort()).toEqual(['Straße', 'strasse-other']);
+    });
+
+    it('reports match indexes against the original accented value', () => {
+      // "café" — folded query "cafe" matches c(0) a(1) f(2) é(3).
+      const m = new fuzzyNative.Matcher(...genIds(['café']), {
+        ignoreDiacritics: true,
+      });
+      const result = m.match('cafe', { recordMatchIndexes: true });
+      expect(result.length).toBe(1);
+      expect(result[0].value).toBe('café');
+      expect(result[0].matchIndexes).toEqual([0, 1, 2, 3]);
+    });
+
+    it('maps indexes correctly when a fold expands (ß -> ss)', () => {
+      // "Straße": S(0) t(1) r(2) a(3) ß(4) e(5). Folded: "strasse".
+      // Query "strasse" matches folded s,t,r,a,s,s,e -> original offsets
+      // 0,1,2,3,4,4,5 (both folded 's's come from the single ß at offset 4).
+      const m = new fuzzyNative.Matcher(...genIds(['Straße']), {
+        ignoreDiacritics: true,
+      });
+      const result = m.match('strasse', { recordMatchIndexes: true });
+      expect(result[0].matchIndexes).toEqual([0, 1, 2, 3, 4, 4, 5]);
+    });
+
+    it('leaves matching unchanged when disabled (default)', () => {
+      const m = new fuzzyNative.Matcher(...genIds(['café', 'cafe']));
+      // Without folding, the ASCII query only matches the ASCII candidate.
+      expect(values(m.match('cafe'))).toEqual(['cafe']);
+    });
   });
 
   it('returns matches when using different path separators', () => {

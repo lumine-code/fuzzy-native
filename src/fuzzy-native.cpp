@@ -20,6 +20,15 @@ using namespace Napi;
 
 Matcher::Matcher(const Napi::CallbackInfo &info) : ObjectWrap<Matcher>(info)
 {
+  // An optional third argument may carry matcher-level options. Diacritic
+  // folding must be configured before candidates are added, since each
+  // candidate's folded form is precomputed at add time.
+  if (info.Length() > 2 && info[2].IsObject()) {
+    Napi::Object opts = info[2].As<Napi::Object>();
+    if (opts.Has("ignoreDiacritics")) {
+      this->_impl.setIgnoreDiacritics(opts.Get("ignoreDiacritics").ToBoolean());
+    }
+  }
   if (info.Length() > 0) {
     AddCandidates(info);
   }
@@ -98,11 +107,17 @@ void Matcher::AddCandidates(const Napi::CallbackInfo &info)
     this->_impl.reserve(this->_impl.size() + ids.Length());
     for (auto i : indexes) {
       auto id_value = ids.Get(i);
+      // Validate types before converting: with C++ exceptions disabled, calling
+      // DoubleValue()/Utf8Value() on the wrong type aborts the process instead
+      // of throwing, so a bad input would hard-crash the whole (renderer)
+      // process rather than raising a catchable JS error.
+      CHECK(env, id_value.IsNumber(), "Expected first array to only contain unsigned 32-bit integer ids");
       double raw = id_value.As<Napi::Number>().DoubleValue();
       CHECK(env, raw >= 0 && raw == std::floor(raw), "Expected first array to only contain unsigned 32-bit integer ids");
       uint32_t id = id_value.As<Napi::Number>().Uint32Value();
-      auto value = values.Get(i).As<Napi::String>();
-      this->_impl.addCandidate(id, value.Utf8Value());
+      auto value = values.Get(i);
+      CHECK(env, value.IsString(), "Expected second array to only contain strings");
+      this->_impl.addCandidate(id, value.As<Napi::String>().Utf8Value());
     }
   }
 }
@@ -115,6 +130,7 @@ void Matcher::RemoveCandidates(const Napi::CallbackInfo &info)
     auto ids = info[0].As<Napi::Array>();
     for (size_t i = 0; i < ids.Length(); i++) {
       auto id_value = ids.Get(i);
+      CHECK(env, id_value.IsNumber(), "Expected array to only contain unsigned 32-bit integer ids");
       double raw = id_value.As<Napi::Number>().DoubleValue();
       CHECK(env, raw >= 0 && raw == std::floor(raw), "Expected array to only contain unsigned 32-bit integer ids");
       uint32_t id = id_value.As<Napi::Number>().Uint32Value();

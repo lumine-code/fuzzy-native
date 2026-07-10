@@ -59,6 +59,21 @@ export type MatchResult = {
   matchIndexes?: number[];
 }
 
+/**
+ * Matcher-level options fixed at construction time.
+ */
+export type MatcherConstructorOptions = {
+  /**
+   * When `true`, candidates and queries are folded to a lowercase,
+   * diacritic-free ASCII form before matching, so e.g. `"cafe"` matches
+   * `"café"`. Reported `matchIndexes` are mapped back to offsets in the
+   * original (accented) `value`. Must be set at construction because each
+   * candidate's folded form is precomputed when it is added. Defaults to
+   * `false`.
+   */
+  ignoreDiacritics?: boolean;
+};
+
 export class Matcher {
   /**
    * Construct a new {@link Matcher} object.
@@ -70,9 +85,10 @@ export class Matcher {
    * @param ids A list of numeric IDs. Must correspond to the candidates
    *  themselves.
    * @param candidates A list of candidates against which we will be matching.
+   * @param options Matcher-level {@link MatcherConstructorOptions}.
    */
   constructor();
-  constructor(ids: number[], candidates: string[]);
+  constructor(ids: number[], candidates: string[], options?: MatcherConstructorOptions);
 
   /**
    * Find all candidates that match the given query.
