@@ -1,30 +1,45 @@
-name: Tests
+name: CI
+
 on:
-  pull_request:
   push:
-    branches: ['master']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    name: Run tests
-    if: |
-      !startsWith(github.event.pull_request.title, '[skip-ci]') &&
-      !startsWith(github.event.pull_request.title, '[skip-package-ci]')
-    runs-on: ubuntu-22.04
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 20
+          - os: ubuntu-latest
+            node: 24
+          - os: macos-latest
+            node: 24
+          - os: windows-latest
+            node: 24
     steps:
-    - name: Checkout the latest code
-      uses: actions/checkout@v3
-
-    - name: Setup node
-      uses: actions/setup-node@v3
-      with:
-        node-version: 20
-
-    - name: Install Python setuptools
-      run: python3 -m pip install setuptools
-
-    - name: Install Dependencies
-      run: npm install
-
-    - name: Run tests
-      run: npm run test
+      - name: Enable Git symlinks on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.symlinks true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Validate package contents
+        run: npm pack --dry-run
