@@ -450,4 +450,32 @@ describe('fuzzy-native', function() {
       '/path1/path2/path3/zzz/ooo'
     ]);
   });
+
+  it('matches a path separator even when a literal _ or \\ occurs earlier', () => {
+    // A literal occurrence before the separator must not cap the search
+    // range for the separator-like needle character.
+    matcher.setCandidates(...genIds(['lib/foo_utils/bar.js']));
+    expect(values(matcher.match('utils_bar'))).toEqual(['lib/foo_utils/bar.js']);
+
+    matcher.setCandidates(...genIds(['\\ab/cd']));
+    expect(values(matcher.match('b\\cd'))).toEqual(['\\ab/cd']);
+  });
+
+  it('matches backslash-separated paths with /, _ and \\ in the query', () => {
+    matcher.setCandidates(...genIds(['src\\main\\app.js']));
+    expect(values(matcher.match('src/app'))).toEqual(['src\\main\\app.js']);
+    expect(values(matcher.match('src_app'))).toEqual(['src\\main\\app.js']);
+    expect(values(matcher.match('src\\app'))).toEqual(['src\\main\\app.js']);
+  });
+
+  it('ranks exact separators above substituted ones for both slash kinds', () => {
+    matcher.setCandidates(...genIds(['a/b', 'a\\b']));
+    expect(values(matcher.match('a/b'))).toEqual(['a/b', 'a\\b']);
+    expect(values(matcher.match('a\\b'))).toEqual(['a\\b', 'a/b']);
+  });
+
+  it('does not match / against a literal underscore', () => {
+    matcher.setCandidates(...genIds(['ab_cd']));
+    expect(values(matcher.match('ab/cd'))).toEqual([]);
+  });
 });

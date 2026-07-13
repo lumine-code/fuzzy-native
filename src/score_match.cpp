@@ -98,13 +98,13 @@ float recursive_match(const MatchInfo &m,
     if (needle_idx == 0 && is_path_sep) {
       last_slash = j;
     }
-    if (c == d || (is_path_sep && (c == '_' || c == '\\'))) {
+    if (c == d || (is_path_sep && (c == '_' || c == '/' || c == '\\'))) {
       // calculate score
       float char_score = 1.0;
       if (j > haystack_idx) {
         char last = m.haystack[j - 1];
         char curr = m.haystack[j]; // case matters, so get again
-        if (last == '/') {
+        if (last == '/' || last == '\\') {
           char_score = 0.9;
         } else if (last == '-' || last == '_' || last == ' ' ||
                    (last >= '0' && last <= '9')) {
@@ -128,7 +128,7 @@ float recursive_match(const MatchInfo &m,
       // This will make the exact matches have higher score than the case
       // insensitive and the path insensitive matches.
       if (
-        (m.smart_case || m.haystack[j] == '/') &&
+        (m.smart_case || m.haystack[j] == '/' || m.haystack[j] == '\\') &&
         m.needle[needle_idx] != m.haystack[j]
       ) {
         char_score *= 0.001;
@@ -186,6 +186,11 @@ float score_match(const char *haystack,
   MatchInfo m;
   m.haystack_len = strlen(haystack);
   m.needle_len = strlen(needle);
+  // A needle longer than the haystack can never match; bail before
+  // stack-allocating needle-sized buffers.
+  if (m.needle_len > m.haystack_len) {
+    return 0;
+  }
   m.haystack_case = options.case_sensitive ? haystack : haystack_lower;
   m.needle_case = options.case_sensitive ? needle : needle_lower;
   m.smart_case = options.smart_case;
@@ -204,17 +209,25 @@ float score_match(const char *haystack,
   // character (which prunes the search space by a ton)
   int hindex = m.haystack_len;
   for (int i = m.needle_len - 1; i >= 0; i--) {
-    char* ptr = (char*)memrchr(m.haystack_case, m.needle_case[i], hindex);
+    char c = m.needle_case[i];
+    char* ptr = (char*)memrchr(m.haystack_case, c, hindex);
+    // _, / and \ in the needle also match either path separator, so the last
+    // possible match is the rightmost among all the alternatives — not the
+    // literal occurrence with the separators as a mere fallback.
+    if (c == '_' || c == '/' || c == '\\') {
+      const char seps[] = {'/', '\\'};
+      for (char sep : seps) {
+        if (sep == c) {
+          continue;
+        }
+        char* sep_ptr = (char*)memrchr(m.haystack_case, sep, hindex);
+        if (sep_ptr != nullptr && (ptr == nullptr || sep_ptr > ptr)) {
+          ptr = sep_ptr;
+        }
+      }
+    }
     if (ptr == nullptr) {
-      // Since we treat _ and \\ as path separators, we need to re-check if path
-      // separator exists on the string in case they exact chars are not found.
-      if (m.needle_case[i] == '_' || m.needle_case[i] == '\\') {
-        ptr = (char*)memrchr(m.haystack_case, '/', hindex);
-      }
-
-      if (ptr == nullptr) {
-        return 0;
-      }
+      return 0;
     }
     hindex = ptr - m.haystack_case;
     last_match[i] = hindex;
