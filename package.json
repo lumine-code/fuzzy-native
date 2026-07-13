@@ -1,7 +1,8 @@
 {
   "name": "@lumine-code/fuzzy-native",
+  "author": "lumine-code",
   "version": "2.0.0",
-  "description": "Native C++ implementation of a fuzzy string matcher.",
+  "description": "Provides fast native fuzzy string matching with multithreading and diacritic-aware scoring.",
   "main": "lib/main.js",
   "types": "lib/main.d.ts",
   "scripts": {
@@ -18,10 +19,12 @@
     "matcher",
     "string"
   ],
-  "author": "Hanson Wang (hanson.wng@gmail.com)",
   "repository": "https://github.com/lumine-code/fuzzy-native",
   "bugs": "https://github.com/lumine-code/fuzzy-native/issues",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "node-addon-api": "^8.8.0"
   },

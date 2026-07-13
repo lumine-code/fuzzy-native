@@ -1,6 +1,18 @@
 # @lumine-code/fuzzy-native
 
-Fuzzy string matching library package for Node. Implemented natively in C++ for speed with support for multithreading.
+Provides fast native fuzzy string matching with multithreading and diacritic-aware scoring.
+
+## Features
+
+- **Native performance**: scores candidate sets in C++ with multithreaded matching.
+- **Path-aware ranking**: prioritizes word boundaries, consecutive matches, and file path segments.
+- **Diacritic handling**: optionally folds accents while preserving indexes into the original text.
+
+## Installation
+
+```sh
+npm install @lumine-code/fuzzy-native
+```
 
 The scoring algorithm is heavily tuned for file paths, but should work for general strings. It also supports the Fuzzaldrin algorithm used by Lumine's command palette and other fuzzy finders.
 
@@ -44,4 +56,8 @@ There are a few notable additional optimizations:
 
 ### Fuzzaldrin
 
-Ported from Atom's Fuzzaldrin app - it's easier to read the original version than to read the C++ one, they are basically identic: see [scorer.coffee](https://github.com/atom/fuzzaldrin/blob/master/src/scorer.coffee) from Atom's archived repository.
+Ported from the original Fuzzaldrin implementation. Its [scorer](https://github.com/atom/fuzzaldrin/blob/master/src/scorer.coffee) is easier to follow than the equivalent optimized C++ code.
+
+## Contributing
+
+Got ideas to make this package better, found a bug, or want to help add new features? Just drop your thoughts on GitHub. Any feedback is welcome!
