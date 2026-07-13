@@ -1,6 +1,6 @@
 {
-  "name": "@pulsar-edit/fuzzy-native",
-  "version": "1.4.0",
+  "name": "@lumine-code/fuzzy-native",
+  "version": "2.0.0",
   "description": "Native C++ implementation of a fuzzy string matcher.",
   "main": "lib/main.js",
   "types": "lib/main.d.ts",
@@ -19,7 +19,8 @@
     "string"
   ],
   "author": "Hanson Wang (hanson.wng@gmail.com)",
-  "repository": "https://github.com/pulsar-edit/fuzzy-native",
+  "repository": "https://github.com/lumine-code/fuzzy-native",
+  "bugs": "https://github.com/lumine-code/fuzzy-native/issues",
   "license": "MIT",
   "dependencies": {
     "node-addon-api": "^8.8.0"
