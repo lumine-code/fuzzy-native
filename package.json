@@ -26,10 +26,9 @@
     "access": "public"
   },
   "dependencies": {
-    "node-addon-api": "^8.8.0"
+    "node-addon-api": "^8.9.0"
   },
   "devDependencies": {
-    "jasmine-node": "^1.14.5",
-    "rimraf": "^2.5.2"
+    "@lumine-code/jasmine-node": "https://github.com/lumine-code/jasmine-node.git#e8f7ea4bdcff09d812afdf356f95ccff91f26aa4"
   }
 }
