@@ -6,7 +6,7 @@
   "main": "lib/main.js",
   "types": "lib/main.d.ts",
   "scripts": {
-    "test": "jasmine-node --captureExceptions spec"
+    "test": "jasmine"
   },
   "files": [
     "binding.gyp",
@@ -29,6 +29,6 @@
     "node-addon-api": "^8.9.0"
   },
   "devDependencies": {
-    "@lumine-code/jasmine-node": "https://github.com/lumine-code/jasmine-node.git#e8f7ea4bdcff09d812afdf356f95ccff91f26aa4"
+    "jasmine": "^6.3.0"
   }
 }

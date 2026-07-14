@@ -297,23 +297,23 @@ describe('fuzzy-native', function() {
 
   it('ensures that the ids array and the values array are the same length when adding candidates', () => {
     const expectedMessage = 'Expected ids array and values array to have the same length';
-    expect(() => matcher.addCandidates([1, 2, 3], ["a", "b"])).toThrow(expectedMessage)
-    expect(() => matcher.addCandidates([1, 2], ["a", "b", "c"])).toThrow(expectedMessage)
+    expect(() => matcher.addCandidates([1, 2, 3], ["a", "b"])).toThrowError(expectedMessage)
+    expect(() => matcher.addCandidates([1, 2], ["a", "b", "c"])).toThrowError(expectedMessage)
   });
 
   it('throws (rather than crashing) on non-string candidates or non-number ids', () => {
     // With C++ exceptions disabled, converting the wrong type used to abort the
     // whole process; these must raise catchable JS errors instead.
-    expect(() => matcher.addCandidates([0], [{}])).toThrow(
+    expect(() => matcher.addCandidates([0], [{}])).toThrowError(
       'Expected second array to only contain strings'
     );
-    expect(() => matcher.addCandidates([0], [123])).toThrow(
+    expect(() => matcher.addCandidates([0], [123])).toThrowError(
       'Expected second array to only contain strings'
     );
-    expect(() => matcher.addCandidates(['x'], ['a'])).toThrow(
+    expect(() => matcher.addCandidates(['x'], ['a'])).toThrowError(
       'Expected first array to only contain unsigned 32-bit integer ids'
     );
-    expect(() => matcher.removeCandidates([{}])).toThrow(
+    expect(() => matcher.removeCandidates([{}])).toThrowError(
       'Expected array to only contain unsigned 32-bit integer ids'
     );
     // The matcher is still usable afterwards.
