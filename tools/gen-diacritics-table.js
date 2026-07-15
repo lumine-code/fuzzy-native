@@ -1,7 +1,3 @@
-// Generates src/diacritics_table.h from the `diacritic` npm package used by
-// lumine/shared/select-list, so the native fold table matches the previous
-// JS behaviour (Diacritics.clean) exactly.
-//
 // Usage: node tools/gen-diacritics-table.js
 const path = require("path");
 const fs = require("fs");
