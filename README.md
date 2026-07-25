@@ -1,4 +1,4 @@
-# @lumine-code/fuzzy-native
+# fuzzy-native
 
 Provides fast native fuzzy string matching with multithreading and diacritic-aware scoring.
 
