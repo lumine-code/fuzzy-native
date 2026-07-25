@@ -17,7 +17,10 @@
     "fuzzy",
     "native",
     "matcher",
-    "string"
+    "fuzzaldrin",
+    "scoring",
+    "multithreading",
+    "diacritics"
   ],
   "repository": "https://github.com/lumine-code/fuzzy-native",
   "bugs": "https://github.com/lumine-code/fuzzy-native/issues",
