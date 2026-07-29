@@ -3,15 +3,26 @@
  * The options that can be passed to {@link Matcher#match}.
  */
 export type MatcherOptions = {
-  /** Whether matching is case-sensitive. Defaults to `false`. */
+  /**
+   * Whether matching is case-sensitive (`"command-t"` only; the
+   * `"fuzzaldrin"` algorithm is always case-insensitive with a same-case
+   * bonus). Defaults to `false`.
+   */
   caseSensitive?: boolean;
+
+  /**
+   * When `true` and the query contains an uppercase letter, matching becomes
+   * case-sensitive (`"command-t"` only). Defaults to `false`.
+   */
+  smartCase?: boolean;
 
   /** How many results to return at the maximum. Defaults to no limit. */
   maxResults?: number;
 
   /**
-   * Maximum “gap” to allow between consecutive letters for a match candiate.
-   * Provide a smaller value to speed up query results. Defaults to no limit.
+   * Maximum “gap” to allow between consecutive letters for a match candidate
+   * (`"command-t"` only). Provide a smaller value to speed up query results.
+   * Defaults to no limit.
    */
   maxGap?: number;
 
@@ -27,11 +38,33 @@ export type MatcherOptions = {
   recordMatchIndexes?: boolean;
 
   /**
-   * The algorithm to use for fuzzy-matching. If `"fuzzaldrin"`, will use that
-   * algorithm for legacy support. Any other value, including the default of
-   * `undefined`, will trigger use of the default algorithm.
+   * A path used to break ties between equally-scored candidates: candidates
+   * sharing more leading directories with `rootPath` (and having fewer
+   * directories overall) win the tie.
    */
-  algorithm?: 'fuzzaldrin' | undefined;
+  rootPath?: string;
+
+  /**
+   * The algorithm to use for fuzzy-matching. `"fuzzaldrin"` is a native port
+   * of the fuzzaldrin-plus scoring algorithm (acronym and consecutive-run
+   * bonuses, basename-aware path scoring). Any other value, including the
+   * default of `undefined`, selects the command-t algorithm.
+   */
+  algorithm?: 'fuzzaldrin' | 'command-t';
+
+  /**
+   * Whether the `"fuzzaldrin"` algorithm blends the basename score with the
+   * full-path score by directory depth. A no-op for candidates without path
+   * separators. Defaults to `true`.
+   */
+  usePathScoring?: boolean;
+
+  /**
+   * Whether the `"fuzzaldrin"` algorithm awards a bonus for matching the file
+   * extension (e.g. query `mf.h` prefers `myFile.h` over `myFile.html`).
+   * Defaults to `false`.
+   */
+  useExtensionBonus?: boolean;
 };
 
 /**
@@ -52,9 +85,12 @@ export type MatchResult = {
   score: number;
 
   /**
-   * Matching charcter index in `value` for each character in `query`. This can
-   * be costly, so this information is returned only when
-   * {@link MatcherOptions.recordMatchIndexes} is `true`.
+   * Matching character indexes in `value`, for highlight rendering. With the
+   * `"command-t"` algorithm there is one index per query character; with
+   * `"fuzzaldrin"` the array can be shorter (optional characters such as
+   * `-`/`_`/`/` may go unmatched) or longer (full-path and basename
+   * alignments are merged). This can be costly, so this information is
+   * returned only when {@link MatcherOptions.recordMatchIndexes} is `true`.
    */
   matchIndexes?: number[];
 }

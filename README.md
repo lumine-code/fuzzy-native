@@ -5,6 +5,7 @@ Provides fast native fuzzy string matching with multithreading and diacritic-awa
 ## Features
 
 - **Native performance**: scores candidate sets in C++ with multithreaded matching.
+- **Two algorithms**: command-t scoring for paths and a full fuzzaldrin-plus port for general ranking.
 - **Path-aware ranking**: prioritizes word boundaries, consecutive matches, and file path segments.
 - **Diacritic handling**: optionally folds accents while preserving indexes into the original text.
 
@@ -14,7 +15,7 @@ Provides fast native fuzzy string matching with multithreading and diacritic-awa
 npm install @lumine-code/fuzzy-native
 ```
 
-The scoring algorithm is heavily tuned for file paths, but should work for general strings. It also supports the Fuzzaldrin algorithm used by Lumine's command palette and other fuzzy finders.
+The default scoring algorithm is heavily tuned for file paths, but should work for general strings. The package also ships a faithful native port of the fuzzaldrin-plus algorithm, which Lumine's command palette, select lists, and other fuzzy finders use.
 
 ## API
 
@@ -56,7 +57,37 @@ There are a few notable additional optimizations:
 
 ### Fuzzaldrin
 
-Ported from the original Fuzzaldrin implementation. Its [scorer](https://github.com/atom/fuzzaldrin/blob/master/src/scorer.coffee) is easier to follow than the equivalent optimized C++ code.
+Selected with `{ algorithm: "fuzzaldrin" }`. A faithful C++ port of the
+[fuzzaldrin-plus](https://github.com/jeancroy/fuzz-aldrin-plus) scoring
+algorithm, translated from [zadeh](https://github.com/atom-community/zadeh)
+(Apache-2.0; see [LICENSE-zadeh](LICENSE-zadeh) — deviations are marked with
+`PORT NOTE` comments in [src/fuzzaldrin.cpp](src/fuzzaldrin.cpp)):
+
+- An optimal-alignment scorer (Smith–Waterman over two rolling rows) with
+  bonuses for acronyms (`fb` → `FooBar`, `foo-bar`), consecutive runs, word
+  boundaries, same-case matches, and matches near the start of the string,
+  plus a miss budget that bounds worst-case work.
+- `" _-:/\"` are *optional* query characters: they improve the score when
+  present but never block a match, so `foo-bar` still matches `foo/bar` and
+  `foobar`.
+- Path scoring (`usePathScoring`, default `true`): the final score
+  interpolates between the basename score and the full-path score by
+  directory depth, so shallow paths and basename hits rank first. An optional
+  extension bonus (`useExtensionBonus`, default `false`) prefers `myFile.h`
+  over `myFile.html` for the query `mf.h`.
+- Both slash kinds are equivalent in every character comparison, so
+  Windows-native `src\main\app.js` scores identically to `src/main/app.js`.
+- `matchIndexes` come from the same algorithm (a trace-matrix alignment with
+  basename merging), so highlights always agree with the ranking. The array
+  can be shorter than the query (unmatched optional characters) or longer
+  (basename positions merge in).
+- Raw fuzzaldrin-plus scores are unbounded; they are normalized to `(0, 1]`
+  against the query's self-match score, so `1` means an exact (or better,
+  e.g. exact-basename) match.
+
+The `caseSensitive`, `smartCase`, and `maxGap` options apply only to the
+default algorithm; `usePathScoring` and `useExtensionBonus` apply only to
+fuzzaldrin.
 
 ## Contributing
 
