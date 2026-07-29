@@ -6,10 +6,16 @@
 #include <unordered_map>
 #include <vector>
 
+enum class ScoringAlgorithm : uint8_t { CommandT, Fuzzaldrin };
+
 struct MatcherOptions {
   bool case_sensitive = false;
   bool smart_case = false;
-  bool fuzzaldrin = false;
+  ScoringAlgorithm algorithm = ScoringAlgorithm::CommandT;
+  // Fuzzaldrin-only knobs (fuzzaldrin-plus parity: path scoring on,
+  // extension bonus off).
+  bool use_path_scoring = true;
+  bool use_extension_bonus = false;
   size_t num_threads = 0;
   size_t max_results = 0;
   size_t max_gap = 0;
@@ -102,5 +108,10 @@ private:
   std::vector<CandidateData> candidates_;
   std::unordered_map<uint32_t, size_t> lookup_;
   std::string lastQuery_;
+  // The last_match skip cache is only valid within one algorithm's match
+  // semantics — a candidate rejected by one algorithm can match under the
+  // other (e.g. a literal `-` is required by command-t but optional for
+  // fuzzaldrin).
+  ScoringAlgorithm lastAlgorithm_ = ScoringAlgorithm::CommandT;
   bool ignore_diacritics_ = false;
 };

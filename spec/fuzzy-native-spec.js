@@ -84,22 +84,33 @@ describe('fuzzy-native', function() {
 
   it('can match strings for alternate scoring', function() {
     let results = matcher.match('tiatd', {algorithm: 'fuzzaldrin'});
+
+    // Exact basename match first, then the acronym matches (the path
+    // segments and the camelCase word starts), then scattered characters.
+    expect(values(results)).toEqual([
+      '/test/tiatd',
+      '/this/is/a/test/dir',
+      '/////ThisIsATestDir',
+      'thisisatestdir',
+    ]);
+    // Normalized to (0, 1] and strictly descending.
+    for (const result of results) {
+      expect(result.score).toBeGreaterThan(0);
+      expect(result.score).toBeLessThanOrEqual(1);
+    }
+    expect(results[0].score).toBeCloseTo(0.9823, 4);
+    expect(results[1].score).toBeCloseTo(0.4585, 4);
+    expect(results[2].score).toBeCloseTo(0.1221, 4);
+    expect(results[3].score).toBeCloseTo(0.0592, 4);
+
+    // Default (file-based) algorithm
+    results = matcher.match('tiatd');
     const resultsWithScores = () => results.map(result => {
       return {
         value: result.value,
         score: Math.round(result.score * 10000) / 10000
       };
     });
-
-    expect(resultsWithScores()).toEqual([
-      {value: '/test/tiatd', score: 0.14},
-      {value: 'thisisatestdir', score: 0.0635},
-      {value: '/////ThisIsATestDir', score: 0.0231},
-      {value: '/this/is/a/test/dir', score: 0.0212},
-    ]);
-
-    // Default (file-based) algorithm
-    results = matcher.match('tiatd');
     expect(resultsWithScores()).toEqual([
       {value: '/test/tiatd', score: 0.75},
       {value: '/this/is/a/test/dir', score: 0.1554},
@@ -477,5 +488,162 @@ describe('fuzzy-native', function() {
   it('does not match / against a literal underscore', () => {
     matcher.setCandidates(...genIds(['ab_cd']));
     expect(values(matcher.match('ab/cd'))).toEqual([]);
+  });
+
+  describe('algorithm: fuzzaldrin (fuzzaldrin-plus port)', () => {
+    const fz = {algorithm: 'fuzzaldrin'};
+
+    it('scores an exact match 1.0 and ranks it above partial matches', () => {
+      matcher.setCandidates(...genIds(['select', 'selection', 'select-list', 'so-elect']));
+      const results = matcher.match('select', fz);
+      expect(values(results)).toEqual(['select', 'select-list', 'selection', 'so-elect']);
+      expect(results[0].score).toBe(1);
+      for (const result of results) {
+        expect(result.score).toBeGreaterThan(0);
+        expect(result.score).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it('ranks acronym matches far above scattered matches', () => {
+      matcher.setCandidates(...genIds(['FooBar', 'foo-bar', 'foo_bar', 'fxoxbxr', 'foobar', 'flatbush']));
+      const results = matcher.match('fb', fz);
+      // The two separator acronyms are exact ties; their mutual order is
+      // insertion-dependent.
+      expect(values(results).slice(0, 2).sort()).toEqual(['foo-bar', 'foo_bar']);
+      expect(results[0].score).toEqual(results[1].score);
+      expect(results[2].value).toBe('FooBar'); // camelCase acronym
+      expect(results[2].score).toBeGreaterThan(0.5);
+      // Scattered matches trail far behind.
+      for (const result of results.slice(3)) {
+        expect(result.score).toBeLessThan(0.1);
+      }
+    });
+
+    it('lets consecutive runs dominate scattered characters', () => {
+      matcher.setCandidates(...genIds(['core.js', 'controller.js', 'coverage_report.js']));
+      expect(values(matcher.match('core', fz))).toEqual([
+        'core.js',
+        'coverage_report.js',
+        'controller.js',
+      ]);
+    });
+
+    it('interpolates basename and full-path scores by directory depth', () => {
+      matcher.setCandidates(...genIds(['main.js', 'lib/main.js', 'a/b/c/d/main.js', 'domain.js']));
+      const results = matcher.match('main', fz);
+      expect(values(results)).toEqual([
+        'main.js',
+        'lib/main.js',
+        'a/b/c/d/main.js',
+        'domain.js',
+      ]);
+      expect(results[0].score).toBeCloseTo(0.9804, 4);
+      expect(results[1].score).toBeCloseTo(0.9551, 4);
+      expect(results[2].score).toBeCloseTo(0.9357, 4);
+    });
+
+    it('drops the depth preference with usePathScoring: false', () => {
+      matcher.setCandidates(...genIds(['main.js', 'lib/main.js', 'a/b/c/d/main.js', 'domain.js']));
+      const results = matcher.match('main', {...fz, usePathScoring: false});
+      // Without path interpolation the exact-basename-after-slash bonus
+      // saturates both path candidates at the ceiling, depth notwithstanding.
+      expect(values(results)).toEqual([
+        'lib/main.js',
+        'a/b/c/d/main.js',
+        'main.js',
+        'domain.js',
+      ]);
+      expect(results[0].score).toBe(1);
+      expect(results[1].score).toBe(1);
+    });
+
+    it('awards the extension bonus only when enabled', () => {
+      matcher.setCandidates(...genIds(['myFile.h', 'myFile.html', 'myFile.hpp']));
+      const plain = matcher.match('mf.h', fz);
+      expect(values(plain)).toEqual(['myFile.h', 'myFile.hpp', 'myFile.html']);
+
+      const bonus = matcher.match('mf.h', {...fz, useExtensionBonus: true});
+      expect(values(bonus)).toEqual(['myFile.h', 'myFile.hpp', 'myFile.html']);
+      // The exact-extension match is amplified; the partial ones much less.
+      expect(bonus[0].score).toBeGreaterThan(plain[0].score * 1.9);
+      expect(bonus[0].score - bonus[1].score)
+        .toBeGreaterThan(plain[0].score - plain[1].score);
+    });
+
+    it('treats " _-:/\\" as optional query characters', () => {
+      // command-t requires a literal dash; fuzzaldrin only uses it for
+      // bonuses (this is also the prefilter-bitmask regression spec).
+      matcher.setCandidates(...genIds(['foo/bar', 'foo_bar', 'foobar', 'cat']));
+      expect(values(matcher.match('foo-bar', fz))).toEqual([
+        'foo_bar',
+        'foobar',
+        'foo/bar',
+      ]);
+      expect(matcher.match('foo-bar', {algorithm: 'command-t'})).toEqual([]);
+
+      matcher.setCandidates(...genIds(['abcd']));
+      expect(values(matcher.match('ab/cd', fz))).toEqual(['abcd']);
+      expect(matcher.match('ab/cd', {algorithm: 'command-t'})).toEqual([]);
+    });
+
+    it('scores both slash kinds identically', () => {
+      matcher.setCandidates(...genIds(['src\\main\\app.js', 'src/main/app.js', 'unrelated.txt']));
+      const results = matcher.match('src/app', fz);
+      expect(values(results).sort()).toEqual(['src/main/app.js', 'src\\main\\app.js']);
+      expect(results[0].score).toEqual(results[1].score);
+    });
+
+    it('does not blind the skip cache on optional-only queries', () => {
+      // "-" scores 0 for "cat", but its extension "-a" must still match it.
+      matcher.setCandidates(...genIds(['cat', 'dog-house']));
+      expect(values(matcher.match('-', fz))).toEqual(['dog-house']);
+      expect(values(matcher.match('-a', fz))).toEqual(['cat']);
+    });
+
+    it('rescans when the algorithm changes between queries', () => {
+      // command-t rejects "a-b" for "abc" (literal dash); the fuzzaldrin
+      // query "a-bc" extends it and must not inherit the rejection.
+      matcher.setCandidates(...genIds(['abc']));
+      expect(matcher.match('a-b', {algorithm: 'command-t'})).toEqual([]);
+      expect(values(matcher.match('a-bc', fz))).toEqual(['abc']);
+    });
+
+    it('computes match indexes with the fuzzaldrin alignment', () => {
+      const opts = {...fz, recordMatchIndexes: true};
+
+      matcher.setCandidates(...genIds(['abc']));
+      expect(matcher.match('abc', opts)[0].matchIndexes).toEqual([0, 1, 2]);
+
+      // Full-path and basename alignments merge.
+      matcher.setCandidates(...genIds(['app/lib/app.js']));
+      expect(matcher.match('app', opts)[0].matchIndexes).toEqual([0, 1, 2, 8, 9, 10]);
+
+      // An unmatched optional character yields no index (6 entries for a
+      // 7-character query).
+      matcher.setCandidates(...genIds(['foobar']));
+      expect(matcher.match('foo-bar', opts)[0].matchIndexes).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+
+    it('maps fuzzaldrin match indexes through diacritic folding', () => {
+      const opts = {...fz, recordMatchIndexes: true};
+
+      let accented = new fuzzyNative.Matcher(...genIds(['café']), {ignoreDiacritics: true});
+      expect(accented.match('cafe', opts)[0].matchIndexes).toEqual([0, 1, 2, 3]);
+
+      // ß expands to "ss": both folded offsets map back to the ß.
+      accented = new fuzzyNative.Matcher(...genIds(['Straße']), {ignoreDiacritics: true});
+      expect(accented.match('strasse', opts)[0].matchIndexes).toEqual([0, 1, 2, 3, 4, 4, 5]);
+    });
+
+    it('normalizes scores to (0, 1]', () => {
+      matcher.setCandidates(...genIds(['abc', 'x/abc', 'abcdef']));
+      const results = matcher.match('abc', fz);
+      // The exact-basename-after-slash bonus scores above the flat self-match
+      // ceiling and saturates at 1 — genuine fuzzaldrin-plus ordering.
+      expect(values(results)).toEqual(['x/abc', 'abc', 'abcdef']);
+      expect(results[0].score).toBe(1);
+      expect(results[1].score).toBe(1);
+      expect(results[2].score).toBeCloseTo(0.8786, 4);
+    });
   });
 });

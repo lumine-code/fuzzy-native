@@ -51,8 +51,23 @@ Napi::Value Matcher::Match(const Napi::CallbackInfo &info)
       options.max_results = options_obj.Get("maxResults").ToNumber().Uint32Value();
       options.max_gap = options_obj.Get("maxGap").ToNumber().Uint32Value();
       options.record_match_indexes = options_obj.Get("recordMatchIndexes").ToBoolean();
-      options.fuzzaldrin = options_obj.Get("algorithm").ToString().Utf8Value() == "fuzzaldrin";
-      options.root_path = options_obj.Get("rootPath").ToString();
+      if (options_obj.Has("algorithm")) {
+        options.algorithm =
+            options_obj.Get("algorithm").ToString().Utf8Value() == "fuzzaldrin"
+                ? ScoringAlgorithm::Fuzzaldrin
+                : ScoringAlgorithm::CommandT;
+      }
+      // Presence checks matter here: an absent key coerced with ToString()
+      // yields the literal string "undefined" (which used to poison the
+      // root-path tiebreak), and usePathScoring defaults to true, which a
+      // blind ToBoolean() on undefined would flip to false.
+      if (options_obj.Has("rootPath")) {
+        options.root_path = options_obj.Get("rootPath").ToString();
+      }
+      if (options_obj.Has("usePathScoring")) {
+        options.use_path_scoring = options_obj.Get("usePathScoring").ToBoolean();
+      }
+      options.use_extension_bonus = options_obj.Get("useExtensionBonus").ToBoolean();
     }
   auto idKey = Napi::String::New(env, "id");
   auto valueKey = Napi::String::New(env, "value");

@@ -1,16 +1,26 @@
 #include "MatcherBase.h"
 #include "diacritics.h"
-#include "fuzzaldrin_score.h"
+#include "fuzzaldrin.h"
 #include "score_match.h"
 
 #include <algorithm>
 #include <atomic>
+#include <optional>
 #include <queue>
 #include <thread>
 
 using namespace std;
 
 typedef priority_queue<MatchResult> ResultHeap;
+
+// Per-query fuzzaldrin state, prepared once per findMatches() call and shared
+// read-only by all worker threads. `prepared` is non-null exactly when the
+// fuzzaldrin algorithm runs (fuzzaldrin selected and the query non-empty).
+struct FuzzaldrinJob {
+  const fuzzaldrin::PreparedQuery *prepared = nullptr;
+  fuzzaldrin::ScorerOptions scorer_options;
+  float ceiling = 1;
+};
 
 inline uint64_t letter_bitmask(const std::string &str) {
   uint64_t result = 0;
@@ -98,34 +108,71 @@ void push_heap(ResultHeap &heap, float score, int score_based_root_path,
 
 vector<MatchResult> finalize(const string &query, const string &query_case,
                              const MatchOptions &options, bool ignore_diacritics,
-                             bool record_match_indexes, ResultHeap &&heap) {
+                             bool record_match_indexes, const FuzzaldrinJob &fz,
+                             ResultHeap &&heap) {
   vector<MatchResult> vec;
   while (heap.size()) {
     const MatchResult &result = heap.top();
     if (record_match_indexes) {
-      result.matchIndexes.reset(new vector<int>(query.size()));
-      if (ignore_diacritics) {
-        // Score against the folded value to find match positions, then map
-        // each folded byte offset back to a UTF-16 offset in the original
-        // value so callers can highlight the accented display text correctly.
-        vector<int> pos_map;
-        string folded = fold_diacritics(*result.value, &pos_map);
-        score_match(folded.c_str(), folded.c_str(), query.c_str(),
-                    query_case.c_str(), options, 0.0,
-                    result.matchIndexes.get());
-        for (int &idx : *result.matchIndexes) {
-          if (idx >= 0 && idx < (int)pos_map.size()) {
-            idx = pos_map[idx];
+      if (fz.prepared) {
+        // Fuzzaldrin-ranked results take their highlight positions from the
+        // same algorithm (trace-matrix alignment + basename merge). The
+        // returned array can be shorter than the query (optional characters
+        // may go unmatched) or longer (basename positions merge in).
+        if (ignore_diacritics) {
+          // Match against the folded value, then map each folded byte offset
+          // back to a UTF-16 offset in the original value so callers can
+          // highlight the accented display text correctly.
+          vector<int> pos_map;
+          string folded = fold_diacritics(*result.value, &pos_map);
+          auto indexes = fuzzaldrin::match_indexes(folded, folded, *fz.prepared);
+          result.matchIndexes.reset(
+              new vector<int>(indexes.begin(), indexes.end()));
+          for (int &idx : *result.matchIndexes) {
+            if (idx >= 0 && idx < (int)pos_map.size()) {
+              idx = pos_map[idx];
+            }
           }
+        } else {
+          string lower = str_to_lower(*result.value);
+          auto indexes =
+              fuzzaldrin::match_indexes(*result.value, lower, *fz.prepared);
+          result.matchIndexes.reset(
+              new vector<int>(indexes.begin(), indexes.end()));
         }
       } else {
-        string lower = str_to_lower(*result.value);
-        score_match(result.value->c_str(), lower.c_str(), query.c_str(),
-                    query_case.c_str(), options, 0.0,
-                    result.matchIndexes.get());
+        result.matchIndexes.reset(new vector<int>(query.size()));
+        if (ignore_diacritics) {
+          // Score against the folded value to find match positions, then map
+          // each folded byte offset back to a UTF-16 offset in the original
+          // value so callers can highlight the accented display text correctly.
+          vector<int> pos_map;
+          string folded = fold_diacritics(*result.value, &pos_map);
+          score_match(folded.c_str(), folded.c_str(), query.c_str(),
+                      query_case.c_str(), options, 0.0,
+                      result.matchIndexes.get());
+          for (int &idx : *result.matchIndexes) {
+            if (idx >= 0 && idx < (int)pos_map.size()) {
+              idx = pos_map[idx];
+            }
+          }
+        } else {
+          string lower = str_to_lower(*result.value);
+          score_match(result.value->c_str(), lower.c_str(), query.c_str(),
+                      query_case.c_str(), options, 0.0,
+                      result.matchIndexes.get());
+        }
       }
     }
     vec.push_back(result);
+    if (fz.prepared) {
+      // Raw fuzzaldrin-plus scores are unbounded; normalize to the module's
+      // (0, 1] contract against the query's flat self-match ceiling. Heap
+      // ordering already happened in raw units, so top-N selection is exact
+      // fuzzaldrin-plus order; better-than-exact matches (basename bonus)
+      // saturate at 1 and fall to the shorter-string tie-break.
+      vec.back().score = std::min(1.0f, vec.back().score / fz.ceiling);
+    }
     heap.pop();
   }
   reverse(vec.begin(), vec.end());
@@ -133,12 +180,17 @@ vector<MatchResult> finalize(const string &query, const string &query_case,
 }
 
 void thread_worker(const string &query, const string &query_case,
-                   const MatchOptions &options, bool ignore_diacritics,
-                   bool use_last_match, std::atomic<float> *min_score,
-                   size_t max_results,
+                   const MatchOptions &options, const FuzzaldrinJob &fz,
+                   bool ignore_diacritics, bool use_last_match,
+                   std::atomic<float> *min_score, size_t max_results,
                    vector<MatcherBase::CandidateData> &candidates, size_t start,
                    size_t end, ResultHeap &result) {
-  uint64_t bitmask = letter_bitmask(query_case.c_str());
+  // Fuzzaldrin treats " _-:/\" as optional query characters, so its prefilter
+  // must only require the query's core characters — a full-query bitmask
+  // would wrongly demand a literal `-` (the one optional character the
+  // bitmask tracks).
+  uint64_t bitmask = letter_bitmask(fz.prepared ? fz.prepared->core_lw
+                                                : query_case);
   for (size_t i = start; i < end; i++) {
     auto &candidate = candidates[i];
     if (use_last_match && !candidate.last_match) {
@@ -155,9 +207,13 @@ void thread_worker(const string &query, const string &query_case,
       float score;
       if (query == "") {
         score = 1;
-      } else if (options.fuzzaldrin) {
-        score = fuzzaldrin_score(haystack, query);
-        score = fuzzaldrin_basename_score(haystack, query, score);
+      } else if (fz.prepared) {
+        // Raw fuzzaldrin-plus score; normalized to (0, 1] in finalize().
+        // min_score is deliberately not consulted here: the scorer's own
+        // miss-budget bail is its pruning mechanism, and a useful pre-score
+        // upper bound does not exist for this scoring model.
+        score = fuzzaldrin::score(haystack, haystack_case, *fz.prepared,
+                                  fz.scorer_options);
       } else {
         score = score_match(haystack.c_str(), haystack_case.c_str(),
                             query.c_str(), query_case.c_str(), options,
@@ -179,7 +235,10 @@ void thread_worker(const string &query, const string &query_case,
         }
         candidate.last_match = true;
       } else {
-        candidate.last_match = false;
+        // A fuzzaldrin query consisting only of optional characters scores 0
+        // everywhere, yet an extension of it can still match — such a query
+        // must not blind the last_match skip cache.
+        candidate.last_match = fz.prepared && fz.prepared->core_lw.empty();
       }
     }
   }
@@ -197,7 +256,6 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   matchOptions.smart_case = false;
   matchOptions.max_gap = options.max_gap;
   matchOptions.root_path = options.root_path;
-  matchOptions.fuzzaldrin = options.fuzzaldrin;
 
   string new_query;
   // Ignore all whitespace in the query.
@@ -223,15 +281,28 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     query_case = query;
   }
 
+  // The prepared query and normalization ceiling are computed once and
+  // shared read-only across the worker threads.
+  std::optional<fuzzaldrin::PreparedQuery> prepared;
+  FuzzaldrinJob fz;
+  if (options.algorithm == ScoringAlgorithm::Fuzzaldrin && !new_query.empty()) {
+    prepared.emplace(new_query);
+    fz.prepared = &*prepared;
+    fz.scorer_options = {options.use_path_scoring, options.use_extension_bonus};
+    fz.ceiling = fuzzaldrin::score_ceiling(*prepared);
+  }
+
   // If our current query is just an extension of the last query,
   // quickly ignore all previous non-matches as an optimization.
-  bool use_last_match = query_case.substr(0, lastQuery_.size()) == lastQuery_;
+  bool use_last_match = options.algorithm == lastAlgorithm_ &&
+                        query_case.substr(0, lastQuery_.size()) == lastQuery_;
   lastQuery_ = query_case;
+  lastAlgorithm_ = options.algorithm;
 
   ResultHeap combined;
   std::atomic<float> min_score(0);
   if (num_threads == 0 || candidates_.size() < 10000) {
-    thread_worker(new_query, query_case, matchOptions, ignore_diacritics_,
+    thread_worker(new_query, query_case, matchOptions, fz, ignore_diacritics_,
                   use_last_match, &min_score, max_results, candidates_, 0,
                   candidates_.size(), combined);
   } else {
@@ -245,9 +316,10 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
         chunk_size++;
       }
       threads.emplace_back(thread_worker, ref(new_query), ref(query_case),
-                           ref(matchOptions), ignore_diacritics_, use_last_match,
-                           &min_score, max_results, ref(candidates_), cur_start,
-                           cur_start + chunk_size, ref(thread_results[i]));
+                           ref(matchOptions), cref(fz), ignore_diacritics_,
+                           use_last_match, &min_score, max_results,
+                           ref(candidates_), cur_start, cur_start + chunk_size,
+                           ref(thread_results[i]));
       cur_start += chunk_size;
     }
 
@@ -263,7 +335,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   }
 
   return finalize(new_query, query_case, matchOptions, ignore_diacritics_,
-                  options.record_match_indexes, std::move(combined));
+                  options.record_match_indexes, fz, std::move(combined));
 }
 
 void MatcherBase::addCandidate(uint32_t id, const string &candidate) {

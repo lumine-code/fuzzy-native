@@ -20,7 +20,7 @@
       },
       'sources': [
         'src/fuzzy-native.cpp',
-        'src/fuzzaldrin_score.cpp',
+        'src/fuzzaldrin.cpp',
         'src/score_match.cpp',
         'src/MatcherBase.cpp',
         'src/diacritics.cpp',
