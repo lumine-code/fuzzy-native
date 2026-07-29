@@ -1,0 +1,196 @@
+// Usage: node tools/eval-fuzzaldrin.js
+//
+// Ranking-quality harness for the two scoring algorithms. Prints the top-10
+// results for a fixed set of queries over three corpora (command names,
+// package names, file paths) so before/after outputs of an algorithm change
+// can be diffed for rank movements.
+const { Matcher } = require("../lib/main.js");
+
+const corpora = {
+  commands: [
+    "Application: Open Preferences",
+    "Application: Open Your Keymap",
+    "Bookmarks: Toggle Bookmark",
+    "Bookmarks: View All",
+    "Command Palette: Toggle",
+    "Core: Close Pane",
+    "Core: Move To Top",
+    "Editor: Auto Indent",
+    "Editor: Copy Path",
+    "Editor: Delete Line",
+    "Editor: Duplicate Lines",
+    "Editor: Fold All",
+    "Editor: Fold Current Row",
+    "Editor: Join Lines",
+    "Editor: Lower Case",
+    "Editor: Move Line Down",
+    "Editor: Move Line Up",
+    "Editor: Select Line",
+    "Editor: Toggle Line Comments",
+    "Editor: Unfold All",
+    "Editor: Upper Case",
+    "Find And Replace: Find Next",
+    "Find And Replace: Select All",
+    "Find And Replace: Show",
+    "Find And Replace: Toggle",
+    "Fuzzy Files: Toggle",
+    "Git Center: Checkout Branch",
+    "Git Center: Push",
+    "Grammar Selector: Show",
+    "Line Ending Selector: Convert To LF",
+    "Markdown Preview: Toggle",
+    "Pane: Split Down",
+    "Pane: Split Right",
+    "Project List: Toggle",
+    "Settings View: Install Packages And Themes",
+    "Settings View: Open",
+    "Snippets: Available",
+    "Symbols View: Toggle File Symbols",
+    "Terminal: New Terminal",
+    "Theme Selector: Show",
+    "Tree View: Reveal Active File",
+    "Tree View: Toggle",
+    "Tree View: Toggle Focus",
+    "Whitespace: Remove Trailing Whitespace",
+    "Window: Reload",
+  ],
+  packages: [
+    "atom-theme",
+    "autocomplete",
+    "autocomplete-jedi",
+    "autocomplete-lumine",
+    "background-tips",
+    "bib-finder",
+    "bookmarks",
+    "bracket-matcher",
+    "command-palette",
+    "deprecation-cop",
+    "encoding-selector",
+    "fuzzy-explorer",
+    "fuzzy-files",
+    "fuzzy-workspace",
+    "git-center",
+    "git-diff",
+    "git-panel",
+    "github-panel",
+    "grammar-selector",
+    "ide-client",
+    "ide-python",
+    "image-paste",
+    "jupyter-repl",
+    "language-python",
+    "latex-tools",
+    "line-ending-selector",
+    "linter",
+    "lumine-mcp",
+    "markdown-preview",
+    "marker",
+    "navigation-panel",
+    "pdf-view",
+    "prettier",
+    "project-list",
+    "recent-list",
+    "scrollmap",
+    "settings-view",
+    "snippets",
+    "spell-check",
+    "status-bar",
+    "symbols-view",
+    "terminal",
+    "theme-selector",
+    "tree-view",
+    "typst-tools",
+    "whitespace",
+  ],
+  paths: [
+    "lib/main.js",
+    "lib/helpers.js",
+    "lib/select-list.js",
+    "lib/input-dialog.js",
+    "src/fuzzy-matcher.js",
+    "src/workspace.js",
+    "src/text-editor.js",
+    "src/text-editor-component.js",
+    "src/tools.js",
+    "spec/fuzzy-native-spec.js",
+    "spec/workspace-spec.js",
+    "packages/command-palette/lib/list.js",
+    "packages/command-palette/package.json",
+    "packages/fuzzy-files/lib/main.js",
+    "packages/fuzzy-files/lib/path-loader.js",
+    "packages/settings-view/lib/install-panel.js",
+    "packages/settings-view/lib/search-settings-panel.js",
+    "packages/symbols-view/lib/symbols-view.js",
+    "packages/symbols-view/lib/project-view.js",
+    "packages/tree-view/lib/tree-view.js",
+    "packages/tree-view/lib/dialog.js",
+    "packages/autocomplete/lib/autocomplete-manager.js",
+    "packages/autocomplete/lib/suggestion-list-element.js",
+    "static/atom-ui/styles/select-list.css",
+    "static/atom-ui/styles/text.css",
+    "docs/services/marker.md",
+    "tools/eval-fuzzaldrin.js",
+    "tools/gen-diacritics-table.js",
+    "test/helpers.test.js",
+    "README.md",
+    "package.json",
+    "binding.gyp",
+    "src\\score_match.cpp",
+    "src\\score_match.h",
+    "src\\MatcherBase.cpp",
+    "src\\MatcherBase.h",
+    "src\\fuzzy-native.cpp",
+    "src\\diacritics.cpp",
+    "C:\\Data\\Develop\\Lumine\\lumine\\package.json",
+    "C:\\Data\\Develop\\Lumine\\lumine\\src\\fuzzy-matcher.js",
+    "C:\\Data\\Develop\\Lumine\\pkg_lumine\\navigation-panel\\lib\\navi-tree.js",
+    "C:\\Data\\Develop\\Lumine\\pkg_lumine\\bib-finder\\lib\\main.js",
+    "a/very/deeply/nested/directory/tree/holding/one/main.js",
+    "a/very/deeply/nested/directory/tree/holding/one/util.js",
+    "myFile.h",
+    "myFile.html",
+    "myFile.hpp",
+    "index.js",
+    "index.spec.js",
+    "app/models/user.rb",
+    "app/models/user_profile.rb",
+    "app/controllers/users_controller.rb",
+    "app/views/users/index.html.erb",
+    "test/models/user_test.rb",
+    "config/routes.rb",
+    "core/main.py",
+    "core/controller.py",
+    "core/coverage_report.py",
+  ],
+};
+
+const queries = {
+  commands: ["tv", "tvt", "fold", "tgl", "eda", "selall", "instps", "git push", "term", "line"],
+  packages: ["fuzzy", "fzf", "gitc", "ac", "sv", "list", "theme", "np", "mcp"],
+  paths: ["main", "mf.h", "src/app", "user", "ucontroller", "tree", "flist", "sms", "cover", "index"],
+};
+
+function run(algorithm) {
+  console.log(`\n${"#".repeat(70)}\n# algorithm: ${algorithm}\n${"#".repeat(70)}`);
+  for (const [name, candidates] of Object.entries(corpora)) {
+    const matcher = new Matcher(
+      [...Array(candidates.length).keys()],
+      candidates,
+    );
+    console.log(`\n== corpus: ${name} (${candidates.length} candidates) ==`);
+    for (const query of queries[name]) {
+      const results = matcher.match(query, { algorithm, maxResults: 10 });
+      console.log(`\n  query: ${JSON.stringify(query)}`);
+      if (results.length === 0) {
+        console.log("    (no matches)");
+        continue;
+      }
+      for (const r of results) {
+        console.log(`    ${r.score.toFixed(4)}  ${r.value}`);
+      }
+    }
+  }
+}
+
+run("fuzzaldrin");
+run("command-t");
