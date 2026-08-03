@@ -141,10 +141,12 @@ const corpora = {
     "src\\MatcherBase.h",
     "src\\fuzzy-native.cpp",
     "src\\diacritics.cpp",
-    "C:\\Data\\Develop\\Lumine\\lumine\\package.json",
-    "C:\\Data\\Develop\\Lumine\\lumine\\src\\fuzzy-matcher.js",
-    "C:\\Data\\Develop\\Lumine\\pkg_lumine\\navigation-panel\\lib\\navi-tree.js",
-    "C:\\Data\\Develop\\Lumine\\pkg_lumine\\bib-finder\\lib\\main.js",
+    // Drive-lettered absolute paths sharing a long prefix: the separator is a
+    // backslash, and almost every character is in the part nobody types.
+    "C:\\Users\\dev\\src\\editor\\package.json",
+    "C:\\Users\\dev\\src\\editor\\src\\fuzzy-matcher.js",
+    "C:\\Users\\dev\\src\\packages\\navigation-panel\\lib\\navi-tree.js",
+    "C:\\Users\\dev\\src\\packages\\bib-finder\\lib\\main.js",
     "a/very/deeply/nested/directory/tree/holding/one/main.js",
     "a/very/deeply/nested/directory/tree/holding/one/util.js",
     "myFile.h",
