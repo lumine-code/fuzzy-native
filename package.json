@@ -30,7 +30,7 @@
     "access": "public"
   },
   "dependencies": {
-    "node-addon-api": "^8.9.0"
+    "node-addon-api": "^8.9.1"
   },
   "devDependencies": {
     "jasmine": "^6.3.0"
