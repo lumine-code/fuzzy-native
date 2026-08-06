@@ -169,16 +169,24 @@ const corpora = {
 const queries = {
   commands: ["tv", "tvt", "fold", "tgl", "eda", "selall", "instps", "git push", "term", "line"],
   packages: ["fuzzy", "fzf", "gitc", "ac", "sv", "list", "theme", "np", "mcp"],
-  paths: ["main", "mf.h", "src/app", "user", "ucontroller", "tree", "flist", "sms", "cover", "index"],
+  paths: [
+    "main",
+    "mf.h",
+    "src/app",
+    "user",
+    "ucontroller",
+    "tree",
+    "flist",
+    "sms",
+    "cover",
+    "index",
+  ],
 };
 
 function run(algorithm) {
   console.log(`\n${"#".repeat(70)}\n# algorithm: ${algorithm}\n${"#".repeat(70)}`);
   for (const [name, candidates] of Object.entries(corpora)) {
-    const matcher = new Matcher(
-      [...Array(candidates.length).keys()],
-      candidates,
-    );
+    const matcher = new Matcher([...Array(candidates.length).keys()], candidates);
     console.log(`\n== corpus: ${name} (${candidates.length} candidates) ==`);
     for (const query of queries[name]) {
       const results = matcher.match(query, { algorithm, maxResults: 10 });

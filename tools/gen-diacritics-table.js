@@ -3,10 +3,9 @@ const path = require("path");
 const fs = require("fs");
 
 // The `diacritic` package lives in the lumine tree, not in fuzzy-native.
-const Diacritics = require(path.resolve(
-  __dirname,
-  "../../lumine/node_modules/diacritic/diacritics.js",
-));
+const Diacritics = require(
+  path.resolve(__dirname, "../../lumine/node_modules/diacritic/diacritics.js"),
+);
 
 const map = Diacritics.map; // char (code unit) -> base string
 

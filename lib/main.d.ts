@@ -1,4 +1,3 @@
-
 /**
  * The options that can be passed to {@link Matcher#match}.
  */
@@ -50,7 +49,7 @@ export type MatcherOptions = {
    * bonuses, basename-aware path scoring). Any other value, including the
    * default of `undefined`, selects the command-t algorithm.
    */
-  algorithm?: 'fuzzaldrin' | 'command-t';
+  algorithm?: "fuzzaldrin" | "command-t";
 
   /**
    * Whether the `"fuzzaldrin"` algorithm blends the basename score with the
@@ -93,7 +92,7 @@ export type MatchResult = {
    * returned only when {@link MatcherOptions.recordMatchIndexes} is `true`.
    */
   matchIndexes?: number[];
-}
+};
 
 /**
  * Matcher-level options fixed at construction time.

@@ -30,8 +30,8 @@ candidates and queries to a lowercase, diacritic-free ASCII form before
 matching, so e.g. `"cafe"` matches `"café"` and `"strasse"` matches `"Straße"`:
 
 ```js
-const matcher = new Matcher([0, 1], ['café', 'naïve'], { ignoreDiacritics: true });
-matcher.match('cafe'); // => matches 'café'
+const matcher = new Matcher([0, 1], ["café", "naïve"], { ignoreDiacritics: true });
+matcher.match("cafe"); // => matches 'café'
 ```
 
 The reported `value` and `matchIndexes` always refer to the **original**
@@ -44,7 +44,8 @@ construction time (it is not a per-`match()` option). The fold table lives in
 ## Scoring algorithm
 
 ### Default
-The _default scoring_ algorithm is mostly borrowed from @wincent's excellent [command-t](https://github.com/wincent/command-t) vim plugin; most of the code is from [his implementation in  match.c](https://github.com/wincent/command-t/blob/master/ruby/command-t/match.c).
+
+The _default scoring_ algorithm is mostly borrowed from @wincent's excellent [command-t](https://github.com/wincent/command-t) vim plugin; most of the code is from [his implementation in match.c](https://github.com/wincent/command-t/blob/master/ruby/command-t/match.c).
 
 Read [the source code](src/score_match.cpp) for a quick overview of how it works (the function `recursive_match`).
 
@@ -67,7 +68,7 @@ algorithm, translated from [zadeh](https://github.com/atom-community/zadeh)
   bonuses for acronyms (`fb` → `FooBar`, `foo-bar`), consecutive runs, word
   boundaries, same-case matches, and matches near the start of the string,
   plus a miss budget that bounds worst-case work.
-- `" _-:/\"` are *optional* query characters: they improve the score when
+- `" _-:/\"` are _optional_ query characters: they improve the score when
   present but never block a match, so `foo-bar` still matches `foo/bar` and
   `foobar`.
 - Path scoring (`usePathScoring`, default `true`): the final score
