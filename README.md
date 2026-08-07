@@ -60,9 +60,7 @@ There are a few notable additional optimizations:
 
 Selected with `{ algorithm: "fuzzaldrin" }`. A faithful C++ port of the
 [fuzzaldrin-plus](https://github.com/jeancroy/fuzz-aldrin-plus) scoring
-algorithm, translated from [zadeh](https://github.com/atom-community/zadeh)
-(Apache-2.0; see [LICENSE-zadeh](LICENSE-zadeh) — deviations are marked with
-`PORT NOTE` comments in [src/fuzzaldrin.cpp](src/fuzzaldrin.cpp)):
+algorithm, translated from [zadeh](https://github.com/atom-community/zadeh):
 
 - An optimal-alignment scorer (Smith–Waterman over two rolling rows) with
   bonuses for acronyms (`fb` → `FooBar`, `foo-bar`), consecutive runs, word
