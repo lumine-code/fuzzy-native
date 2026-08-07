@@ -28,8 +28,8 @@ jobs:
         # C++ is analysed on each one. The JavaScript is identical everywhere
         # and is analysed once.
         include:
-          - {language: javascript-typescript, os: ubuntu-latest}
-          - {language: cpp, os: ubuntu-latest}
+          - { language: javascript-typescript, os: ubuntu-latest }
+          - { language: cpp, os: ubuntu-latest }
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
