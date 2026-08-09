@@ -39,7 +39,8 @@ The reported `value` and `matchIndexes` always refer to the **original**
 expanding folds such as `ß → ss`, so highlighting lines up with the displayed
 text. Because folded forms are precomputed per candidate, this must be set at
 construction time (it is not a per-`match()` option). The fold table lives in
-`src/diacritics_table.h` and is regenerated via `tools/gen-diacritics-table.js`.
+`src/diacritics_table.h` and is regenerated after `npm install` via
+`node tools/gen-diacritics-table.js`.
 
 ## Scoring algorithm
 
