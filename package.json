@@ -32,15 +32,15 @@
     "access": "public"
   },
   "dependencies": {
-    "node-addon-api": "^8.9.1"
+    "node-addon-api": "^8.9.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "diacritic": "^0.0.2",
-    "eslint": "^10.8.0",
+    "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-n": "^18.2.2",
-    "globals": "^17.9.0",
+    "eslint-plugin-n": "^18.3.0",
+    "globals": "^17.11.0",
     "jasmine": "^6.3.0",
     "prettier": "^3.9.6"
   }
