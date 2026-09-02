@@ -14,7 +14,7 @@ function randomString() {
   return str;
 }
 
-describe("fuzzy-native", function () {
+describe("fuzzy-native large inputs", function () {
   it("works on large inputs", () => {
     var ids = [];
     var candidates = [];

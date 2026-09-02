@@ -3,7 +3,6 @@
   "spec_files": ["**/*[sS]pec.js"],
   "helpers": [],
   "env": {
-    "forbidDuplicateNames": false,
     "stopSpecOnExpectationFailure": false,
     "random": true
   }
