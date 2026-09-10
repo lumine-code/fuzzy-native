@@ -1,7 +1,7 @@
 {
   "name": "@lumine-code/fuzzy-native",
   "author": "lumine-code",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "description": "Provides fast native fuzzy string matching with multithreading and diacritic-aware scoring.",
   "main": "lib/main.js",
   "types": "lib/main.d.ts",
