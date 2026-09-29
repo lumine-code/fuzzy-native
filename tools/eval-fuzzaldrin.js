@@ -56,7 +56,6 @@ const corpora = {
   ],
   packages: [
     "autocomplete",
-    "autocomplete-jedi",
     "autocomplete-lumine",
     "background-tips",
     "bib-finder",
@@ -76,6 +75,7 @@ const corpora = {
     "ide-client",
     "ide-python",
     "image-paste",
+    "jedi-tools",
     "jupyter-repl",
     "language-python",
     "latex-tools",
