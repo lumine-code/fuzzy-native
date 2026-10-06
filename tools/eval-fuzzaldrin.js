@@ -72,7 +72,7 @@ const corpora = {
     "git-panel",
     "github-panel",
     "grammar-selector",
-    "ide-client",
+    "ide",
     "ide-python",
     "image-paste",
     "jedi-tools",
