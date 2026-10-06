@@ -128,17 +128,14 @@ vector<MatchResult> finalize(const string &query, const string &query_case,
           auto indexes = fuzzaldrin::match_indexes(folded, folded, *fz.prepared);
           result.matchIndexes.reset(
               new vector<int>(indexes.begin(), indexes.end()));
-          for (int &idx : *result.matchIndexes) {
-            if (idx >= 0 && idx < (int)pos_map.size()) {
-              idx = pos_map[idx];
-            }
-          }
+          match_indexes_to_utf16(folded, *result.matchIndexes, &pos_map);
         } else {
           string lower = str_to_lower(*result.value);
           auto indexes =
               fuzzaldrin::match_indexes(*result.value, lower, *fz.prepared);
           result.matchIndexes.reset(
               new vector<int>(indexes.begin(), indexes.end()));
+          match_indexes_to_utf16(*result.value, *result.matchIndexes);
         }
       } else {
         result.matchIndexes.reset(new vector<int>(query.size()));
@@ -151,16 +148,13 @@ vector<MatchResult> finalize(const string &query, const string &query_case,
           score_match(folded.c_str(), folded.c_str(), query.c_str(),
                       query_case.c_str(), options, 0.0,
                       result.matchIndexes.get());
-          for (int &idx : *result.matchIndexes) {
-            if (idx >= 0 && idx < (int)pos_map.size()) {
-              idx = pos_map[idx];
-            }
-          }
+          match_indexes_to_utf16(folded, *result.matchIndexes, &pos_map);
         } else {
           string lower = str_to_lower(*result.value);
           score_match(result.value->c_str(), lower.c_str(), query.c_str(),
                       query_case.c_str(), options, 0.0,
                       result.matchIndexes.get());
+          match_indexes_to_utf16(*result.value, *result.matchIndexes);
         }
       }
     }

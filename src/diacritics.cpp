@@ -2,6 +2,7 @@
 #include "diacritics_table.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -113,4 +114,37 @@ std::string fold_diacritics(const std::string &input,
   }
 
   return out;
+}
+
+void match_indexes_to_utf16(const std::string &input,
+                            std::vector<int> &indexes,
+                            const std::vector<int> *fold_map) {
+  if (indexes.empty()) return;
+  if (!fold_map && std::all_of(input.begin(), input.end(), [](unsigned char c) {
+        return c < 0x80;
+      })) return;
+
+  std::vector<int> mapped;
+  mapped.reserve(indexes.size());
+  size_t match_index = 0;
+  int utf16_offset = 0;
+  for (size_t i = 0; i < input.size() && match_index < indexes.size();) {
+    uint32_t cp;
+    size_t len = decode_utf8(input, i, cp);
+    int utf16_width = cp >= 0x10000 ? 2 : 1;
+    bool matched = false;
+    while (match_index < indexes.size() &&
+           indexes[match_index] < static_cast<int>(i + len)) {
+      matched |= indexes[match_index] >= static_cast<int>(i);
+      match_index++;
+    }
+    if (matched) {
+      int offset = fold_map ? (*fold_map)[i] : utf16_offset;
+      mapped.push_back(offset);
+      if (utf16_width == 2) mapped.push_back(offset + 1);
+    }
+    utf16_offset += utf16_width;
+    i += len;
+  }
+  indexes = std::move(mapped);
 }

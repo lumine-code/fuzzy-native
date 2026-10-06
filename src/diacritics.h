@@ -23,3 +23,11 @@
  */
 std::string fold_diacritics(const std::string &input,
                             std::vector<int> *pos_map = nullptr);
+
+// Converts sorted matcher byte offsets into JavaScript UTF-16 offsets. Bytes
+// from one matched code point produce one set of code units, including both
+// surrogate halves for an astral character. With a fold map, distinct ASCII
+// characters produced by an expanding fold retain their repeated offsets.
+void match_indexes_to_utf16(const std::string &input,
+                            std::vector<int> &indexes,
+                            const std::vector<int> *fold_map = nullptr);

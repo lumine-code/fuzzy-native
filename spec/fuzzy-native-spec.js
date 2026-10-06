@@ -345,6 +345,43 @@ describe("fuzzy-native", function () {
     });
   });
 
+  describe("Unicode highlight indexes", () => {
+    for (const algorithm of ["command-t", "fuzzaldrin"]) {
+      for (const ignoreDiacritics of [false, true]) {
+        it(`reports UTF-16 offsets with ${algorithm}, folding ${ignoreDiacritics}`, () => {
+          const fixtures = [
+            ["żółćabc", "abc", [4, 5, 6]],
+            ["éclair", "cl", [1, 2]],
+            ["🙂abc", "abc", [2, 3, 4]],
+            ["a\u0301bc", "bc", [2, 3]],
+            ["東京abc", "abc", [2, 3, 4]],
+            ["éé", "éé", [0, 1]],
+            ["a🙂b", "🙂b", [1, 2, 3]],
+            ["a🙂🙂b", "🙂🙂b", [1, 2, 3, 4, 5]],
+            ["東京", "東京", [0, 1]],
+          ];
+          for (const [value, query, expected] of fixtures) {
+            const m = new fuzzyNative.Matcher(...genIds([value]), { ignoreDiacritics });
+            const results = m.match(query, { algorithm, recordMatchIndexes: true });
+            expect(results.length).withContext(`${value} / ${query}`).toBe(1);
+            expect(results[0].matchIndexes).withContext(`${value} / ${query}`).toEqual(expected);
+            const withoutIndexes = m.match(query, { algorithm });
+            expect(results[0].score).toEqual(withoutIndexes[0].score);
+            expect(results[0].value).toEqual(value);
+          }
+        });
+      }
+
+      it(`maps long-query fallback indexes with ${algorithm}`, () => {
+        const value = "🙂" + "é".repeat(1100) + "abc";
+        const query = "é".repeat(1100) + "abc";
+        const m = new fuzzyNative.Matcher(...genIds([value]));
+        const result = m.match(query, { algorithm, recordMatchIndexes: true })[0];
+        expect(result.matchIndexes).toEqual(Array.from({ length: 1103 }, (_, i) => i + 2));
+      });
+    }
+  });
+
   it("returns matches when using different path separators", () => {
     expect(values(matcher.match("path1_path2_path3_zzz", { caseSensitive: true }))).toEqual([
       "/path1/path2/path3/zzz",

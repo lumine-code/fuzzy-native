@@ -84,8 +84,10 @@ export type MatchResult = {
   score: number;
 
   /**
-   * Matching character indexes in `value`, for highlight rendering. With the
-   * `"command-t"` algorithm there is one index per query character; with
+   * Matching UTF-16 code-unit indexes in `value`, for highlight rendering.
+   * A matched astral character includes both surrogate indexes. Expanding
+   * diacritic folds can map several aligned characters to the same index.
+   * With `"command-t"`, indexes follow the query alignment; with
    * `"fuzzaldrin"` the array can be shorter (optional characters such as
    * `-`/`_`/`/` may go unmatched) or longer (full-path and basename
    * alignments are merged). This can be costly, so this information is
