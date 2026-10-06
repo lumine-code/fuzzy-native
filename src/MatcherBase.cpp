@@ -33,6 +33,7 @@ struct FuzzaldrinJob {
   const fuzzaldrin::UnicodePreparedQuery *unicode_prepared = nullptr;
   const UnicodeText *unicode_query = nullptr;
   bool query_non_ascii = false;
+  bool requires_non_ascii = false;
   fuzzaldrin::ScorerOptions scorer_options;
   float ceiling = 1;
   float unicode_ceiling = 1;
@@ -223,6 +224,13 @@ void thread_worker(const string &query, const string &query_case,
     if (use_last_match && !candidate.last_match) {
       continue;
     }
+    // An ASCII matching string cannot contain a required non-ASCII scalar.
+    // Reject it before allocating a Unicode view, while keeping aliases such
+    // as Kelvin sign and long s eligible when their simple fold is ASCII.
+    if (fz.requires_non_ascii && !candidate.non_ascii) {
+      candidate.last_match = false;
+      continue;
+    }
     if ((bitmask & candidate.bitmask) == bitmask) {
       // In diacritic-insensitive mode the folded form is the string we score
       // against (both the "original" and the case-folded haystack), and the
@@ -354,6 +362,12 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
       fz.unicode_prepared = &*unicode_prepared;
       fz.unicode_ceiling = fuzzaldrin::score_ceiling(*unicode_prepared);
     }
+  }
+  if (unicode_query) {
+    const auto &required = unicode_prepared ? unicode_prepared->core_lw
+        : (options.case_sensitive ? unicode_query->value : unicode_query->folded);
+    fz.requires_non_ascii = any_of(required.begin(), required.end(),
+                                  [](char32_t cp) { return cp >= 0x80; });
   }
 
   // If our current query is just an extension of the last query,

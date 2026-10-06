@@ -145,6 +145,21 @@ describe("Unicode case matching", () => {
         expect(values(matcher.match("γι", options))).toEqual(["ΓΙΑ"]);
       });
 
+      it("keeps Unicode and ASCII case equivalents reachable in a mixed candidate set", () => {
+        const candidates = ["ascii", "żaba", "kb", "sb", "Kb", "ſb", "σabc", "ςabc"];
+        candidates.push(...Array.from({ length: 100 }, (_, index) => `unrelated-${index}`));
+        const matcher = createMatcher(candidates);
+        expect(values(matcher.match("ż", options))).toEqual(["żaba"]);
+        expect(values(matcher.match("Ż", options))).toEqual(["żaba"]);
+        expect(values(matcher.match("Kb", options))).toEqual(["kb", "Kb"].sort());
+        expect(values(matcher.match("ſb", options))).toEqual(["sb", "ſb"].sort());
+        for (const query of ["σ", "ς"]) {
+          expect(values(matcher.match(query, options)))
+            .withContext(query)
+            .toEqual(["σabc", "ςabc"].sort());
+        }
+      });
+
       it("preserves Unicode results across worker threads in a mixed candidate set", () => {
         // At least 10,000 candidates are needed to exercise the native worker path.
         const candidates = Array.from({ length: 10004 }, (_, index) => `unrelated-${index}`);
@@ -174,6 +189,15 @@ describe("Unicode case matching", () => {
       const options = { algorithm: "command-t", caseSensitive: true };
       expect(values(matcher.match("Ża", options))).toEqual(["Żaba"]);
       expect(values(matcher.match("ża", options))).toEqual(["żaba"]);
+    });
+
+    it("keeps Unicode aliases distinct from ASCII in case-sensitive matching", () => {
+      const matcher = createMatcher(["kb", "Kb", "sb", "ſb"]);
+      for (const query of ["Kb", "kb", "ſb", "sb"]) {
+        expect(values(matcher.match(query, { caseSensitive: true })))
+          .withContext(query)
+          .toEqual([query]);
+      }
     });
 
     it("rescans rejected candidates when case sensitivity changes on an extended query", () => {
