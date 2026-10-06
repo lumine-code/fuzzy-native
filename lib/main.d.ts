@@ -5,13 +5,18 @@ export type MatcherOptions = {
   /**
    * Whether matching is case-sensitive (`"command-t"` only; the
    * `"fuzzaldrin"` algorithm is always case-insensitive with a same-case
-   * bonus). Defaults to `false`.
+   * bonus). Case-insensitive matching uses locale-independent Unicode 17
+   * simple case folding, preserving accents and keeping `ß` distinct from
+   * `ss` and `İ` distinct from `i`. Defaults to `false`.
+   * Constructor-level `ignoreDiacritics` preprocessing runs first and may
+   * already lowercase mapped characters before case-sensitive comparison.
    */
   caseSensitive?: boolean;
 
   /**
-   * When `true` and the query contains an uppercase letter, matching becomes
-   * case-sensitive (`"command-t"` only). Defaults to `false`.
+   * When `true` and the query contains a Unicode uppercase or titlecase
+   * letter, wrong-case alignments receive a strong penalty (`"command-t"`
+   * only). Defaults to `false`.
    */
   smartCase?: boolean;
 

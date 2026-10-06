@@ -29,3 +29,10 @@ float score_match(const char *haystack,
                   const MatchOptions &options,
                   const float min_score,
                   std::vector<int> *match_indexes = nullptr);
+
+// The Unicode instantiation operates on aligned original/folded code points;
+// returned indexes refer to code points rather than UTF-8 bytes.
+float score_match(const char32_t *haystack, const char32_t *haystack_folded,
+                  const char32_t *needle, const char32_t *needle_folded,
+                  const MatchOptions &options, float min_score,
+                  std::vector<int> *match_indexes = nullptr);

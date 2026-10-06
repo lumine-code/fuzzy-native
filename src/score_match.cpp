@@ -1,4 +1,6 @@
 #include "score_match.h"
+#include "unicode.h"
+#include <type_traits>
 
 /**
  * This is mostly based on Greg Hurrell's implementation in
@@ -30,12 +32,13 @@ const float MIN_DISTANCE_PENALTY = 0.2;
 const size_t MAX_MEMO_SIZE = 10000;
 
 // Convenience structure for passing around during recursion.
+template <typename Char>
 struct MatchInfo {
-  const char *haystack;
-  const char *haystack_case;
+  const Char *haystack;
+  const Char *haystack_case;
   size_t haystack_len;
-  const char *needle;
-  const char *needle_case;
+  const Char *needle;
+  const Char *needle_case;
   size_t needle_len;
   int* last_match;
   float *memo;
@@ -44,6 +47,27 @@ struct MatchInfo {
   size_t max_gap;
   float min_score;
 };
+
+template <typename Char>
+bool is_camel_boundary(Char last, Char curr) {
+  if constexpr (std::is_same_v<Char, char32_t>) {
+    return is_unicode_lowercase(last) &&
+           (is_unicode_uppercase(curr) || is_unicode_titlecase(curr));
+  } else {
+    return last >= 'a' && last <= 'z' && curr >= 'A' && curr <= 'Z';
+  }
+}
+
+template <typename Char>
+const Char *find_last(const Char *input, Char c, size_t length) {
+  if constexpr (std::is_same_v<Char, char>) return static_cast<const char *>(memrchr(input, c, length));
+  else {
+    while (length > 0) {
+      if (input[--length] == c) return input + length;
+    }
+    return nullptr;
+  }
+}
 
 /**
  * This algorithm essentially looks for an optimal matching
@@ -66,7 +90,8 @@ struct MatchInfo {
  * We use a memoized-recursive implementation, since the state space tends to
  * be relatively sparse in most practical use cases.
  */
-float recursive_match(const MatchInfo &m,
+template <typename Char>
+float recursive_match(const MatchInfo<Char> &m,
                       const size_t haystack_idx,
                       const size_t needle_idx,
                       const float cur_score) {
@@ -81,7 +106,7 @@ float recursive_match(const MatchInfo &m,
 
   float score = 0;
   size_t best_match = 0;
-  char c = m.needle_case[needle_idx];
+  Char c = m.needle_case[needle_idx];
 
   size_t lim = m.last_match[needle_idx];
   if (needle_idx > 0 && m.max_gap && haystack_idx + m.max_gap < lim) {
@@ -92,7 +117,7 @@ float recursive_match(const MatchInfo &m,
   // It won't be accurate for any other run.
   size_t last_slash = 0;
   for (size_t j = haystack_idx; j <= lim; j++) {
-    char d = m.haystack_case[j];
+    Char d = m.haystack_case[j];
     bool is_path_sep = d == '/' || d == '\\';
 
     if (needle_idx == 0 && is_path_sep) {
@@ -102,14 +127,14 @@ float recursive_match(const MatchInfo &m,
       // calculate score
       float char_score = 1.0;
       if (j > haystack_idx) {
-        char last = m.haystack[j - 1];
-        char curr = m.haystack[j]; // case matters, so get again
+        Char last = m.haystack[j - 1];
+        Char curr = m.haystack[j]; // case matters, so get again
         if (last == '/' || last == '\\') {
           char_score = 0.9;
         } else if (last == '-' || last == '_' || last == ' ' ||
                    (last >= '0' && last <= '9')) {
           char_score = 0.8;
-        } else if (last >= 'a' && last <= 'z' && curr >= 'A' && curr <= 'Z') {
+        } else if (is_camel_boundary(last, curr)) {
           char_score = 0.8;
         } else if (last == '.') {
           char_score = 0.7;
@@ -172,10 +197,11 @@ float recursive_match(const MatchInfo &m,
   return memoized = score;
 }
 
-float score_match(const char *haystack,
-                  const char *haystack_lower,
-                  const char *needle,
-                  const char *needle_lower,
+template <typename Char>
+float score_match_impl(const Char *haystack,
+                  const Char *haystack_lower,
+                  const Char *needle,
+                  const Char *needle_lower,
                   const MatchOptions &options,
                   const float min_score,
                   vector<int> *match_indexes) {
@@ -183,9 +209,9 @@ float score_match(const char *haystack,
     return 1.0;
   }
 
-  MatchInfo m;
-  m.haystack_len = strlen(haystack);
-  m.needle_len = strlen(needle);
+  MatchInfo<Char> m;
+  m.haystack_len = std::char_traits<Char>::length(haystack);
+  m.needle_len = std::char_traits<Char>::length(needle);
   // A needle longer than the haystack can never match; bail before
   // stack-allocating needle-sized buffers.
   if (m.needle_len > m.haystack_len) {
@@ -209,18 +235,18 @@ float score_match(const char *haystack,
   // character (which prunes the search space by a ton)
   int hindex = m.haystack_len;
   for (int i = m.needle_len - 1; i >= 0; i--) {
-    char c = m.needle_case[i];
-    char* ptr = (char*)memrchr(m.haystack_case, c, hindex);
+    Char c = m.needle_case[i];
+    const Char* ptr = find_last(m.haystack_case, c, hindex);
     // _, / and \ in the needle also match either path separator, so the last
     // possible match is the rightmost among all the alternatives — not the
     // literal occurrence with the separators as a mere fallback.
     if (c == '_' || c == '/' || c == '\\') {
-      const char seps[] = {'/', '\\'};
-      for (char sep : seps) {
+      const Char seps[] = {'/', '\\'};
+      for (Char sep : seps) {
         if (sep == c) {
           continue;
         }
-        char* sep_ptr = (char*)memrchr(m.haystack_case, sep, hindex);
+        const Char* sep_ptr = find_last(m.haystack_case, sep, hindex);
         if (sep_ptr != nullptr && (ptr == nullptr || sep_ptr > ptr)) {
           ptr = sep_ptr;
         }
@@ -288,4 +314,16 @@ float score_match(const char *haystack,
   }
 
   return score;
+}
+
+float score_match(const char *haystack, const char *haystack_lower,
+                  const char *needle, const char *needle_lower,
+                  const MatchOptions &options, float min_score, vector<int> *indexes) {
+  return score_match_impl(haystack, haystack_lower, needle, needle_lower, options, min_score, indexes);
+}
+
+float score_match(const char32_t *haystack, const char32_t *haystack_lower,
+                  const char32_t *needle, const char32_t *needle_lower,
+                  const MatchOptions &options, float min_score, vector<int> *indexes) {
+  return score_match_impl(haystack, haystack_lower, needle, needle_lower, options, min_score, indexes);
 }

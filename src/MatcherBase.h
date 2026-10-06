@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <optional>
+#include "unicode.h"
 
 enum class ScoringAlgorithm : uint8_t { CommandT, Fuzzaldrin };
 
@@ -29,6 +31,7 @@ struct MatchResult {
   // We can't afford to copy strings around while we're ranking them.
   // These are not guaranteed to last very long and should be copied out ASAP.
   const std::string *value;
+  const UnicodeText *unicode;
   // Only computed if `record_match_indexes` was set to true.
   mutable std::shared_ptr<std::vector<int>> matchIndexes = nullptr;
   int score_based_root_path;
@@ -36,10 +39,12 @@ struct MatchResult {
   MatchResult(float score,
               int score_based_root_path,
               uint32_t id,
-              const std::string *value)
+              const std::string *value,
+              const UnicodeText *unicode = nullptr)
     : score(score),
       id(id),
       value(value),
+      unicode(unicode),
       score_based_root_path(score_based_root_path) {}
 
   // Order small scores to the top of any priority queue.
@@ -66,6 +71,8 @@ public:
     // matcher was created with ignoreDiacritics; used in place of `lowercase`
     // (and `value`) for scoring in that mode.
     std::string folded;
+    bool non_ascii = false;
+    std::unique_ptr<UnicodeText> unicode;
     int num_dirs;
     /**
      * A bitmask representing the counts of letters a-z contained in the string.
@@ -108,10 +115,8 @@ private:
   std::vector<CandidateData> candidates_;
   std::unordered_map<uint32_t, size_t> lookup_;
   std::string lastQuery_;
-  // The last_match skip cache is only valid within one algorithm's match
-  // semantics — a candidate rejected by one algorithm can match under the
-  // other (e.g. a literal `-` is required by command-t but optional for
-  // fuzzaldrin).
-  ScoringAlgorithm lastAlgorithm_ = ScoringAlgorithm::CommandT;
+  // Rejections may only be reused while matching options remain unchanged.
   bool ignore_diacritics_ = false;
+  size_t unicode_candidate_count_ = 0;
+  std::optional<MatcherOptions> lastOptions_;
 };

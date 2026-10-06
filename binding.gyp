@@ -24,6 +24,7 @@
         'src/score_match.cpp',
         'src/MatcherBase.cpp',
         'src/diacritics.cpp',
+        'src/unicode.cpp',
       ],
       'conditions': [
         ['OS == "win"', {

@@ -49,6 +49,10 @@ Selected with `{ algorithm: "fuzzaldrin" }`. A faithful C++ port of the [fuzzald
 
 The `caseSensitive`, `smartCase`, and `maxGap` options apply only to the default algorithm; `usePathScoring` and `useExtensionBonus` apply only to fuzzaldrin.
 
+### Unicode case matching
+
+Case-insensitive matching uses Unicode 17 simple case folding without locale-specific rules. It matches `Ą` with `ą`, the sigma variants `Σ`, `σ` and `ς`, `K` with `k`, and `ſ` with `s`, while preserving accents. Simple folding does not expand characters: `ß` stays distinct from `ss`, and dotted `İ` stays distinct from `i` and `i` followed by a combining dot. Use `ignoreDiacritics` separately for accent-insensitive matching and the existing expanding folds. Both scorers process Unicode code points and return indexes into the original JavaScript UTF-16 string; ASCII inputs retain their existing scoring path. Each required query character consumes a distinct source position. With command-t, `caseSensitive: true` compares matching characters exactly after any `ignoreDiacritics` preprocessing, which also lowercases its mapped characters. `smartCase: true` strongly penalizes wrong-case alignments when the query contains an uppercase or titlecase character.
+
 ### Accent-insensitive matching
 
 Pass `{ ignoreDiacritics: true }` as the third constructor argument to fold candidates and queries to a lowercase, diacritic-free ASCII form before matching, so e.g. `"cafe"` matches `"café"` and `"strasse"` matches `"Straße"`:
