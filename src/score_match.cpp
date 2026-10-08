@@ -11,11 +11,7 @@
 #include <algorithm>
 #include <string>
 #include <cstring>
-
-// memrchr is a non-standard extension only available in glibc.
-#if defined(__APPLE__) || defined(_WIN32) || defined(_WIN64)
-#include "memrchr.h"
-#endif
+#include <iterator>
 
 using namespace std;
 
@@ -60,13 +56,10 @@ bool is_camel_boundary(Char last, Char curr) {
 
 template <typename Char>
 const Char *find_last(const Char *input, Char c, size_t length) {
-  if constexpr (std::is_same_v<Char, char>) return static_cast<const char *>(memrchr(input, c, length));
-  else {
-    while (length > 0) {
-      if (input[--length] == c) return input + length;
-    }
-    return nullptr;
-  }
+  if (length == 0) return nullptr;
+  const auto end = std::make_reverse_iterator(input);
+  const auto found = std::find(std::make_reverse_iterator(input + length), end, c);
+  return found == end ? nullptr : std::prev(found.base());
 }
 
 /**

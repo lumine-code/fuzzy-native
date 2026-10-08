@@ -13,9 +13,7 @@
   "files": [
     "binding.gyp",
     "lib",
-    "src",
-    "LICENSE-zadeh",
-    "LICENSE-Unicode"
+    "src"
   ],
   "keywords": [
     "fuzzy",

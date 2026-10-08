@@ -1,7 +1,7 @@
 // Ported from zadeh (https://github.com/atom-community/zadeh) — a C++
 // implementation of the fuzzaldrin-plus scoring algorithm — from its
 // src/scorer.h, src/path_scorer.h, src/query.h and src/matcher.h.
-// zadeh is licensed under the Apache License, Version 2.0; see LICENSE-zadeh
+// zadeh is licensed under the Apache License, Version 2.0; see LICENSE
 // at the repository root. Deviations from zadeh are marked "PORT NOTE".
 #pragma once
 

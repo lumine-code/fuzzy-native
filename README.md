@@ -2,6 +2,8 @@
 
 Provides fast native fuzzy string matching with multithreading and diacritic-aware scoring.
 
+Fork of [pulsar-edit/fuzzy-native](https://github.com/pulsar-edit/fuzzy-native).
+
 ## Features
 
 - **Native performance**: scores candidate sets in C++ with multithreaded matching.
