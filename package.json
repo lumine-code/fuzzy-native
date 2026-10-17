@@ -13,7 +13,8 @@
   "files": [
     "binding.gyp",
     "lib",
-    "src"
+    "src",
+    "THIRD_PARTY_NOTICES"
   ],
   "keywords": [
     "fuzzy",
