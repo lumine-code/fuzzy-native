@@ -1,10 +1,11 @@
 # fuzzy-native
 
-Archived native fuzzy matcher, replaced by fuzzy-search.
+Provides fast native fuzzy string matching with multithreading and diacritic-aware scoring.
 
 Fork of [pulsar-edit/fuzzy-native](https://github.com/pulsar-edit/fuzzy-native).
 
-**Archived on 2026-10-20.** This repository is no longer maintained. Use [fuzzy-search](https://github.com/lumine-code/fuzzy-search), the JavaScript implementation now used by the editor. No active repository in the Lumine workspace depends on fuzzy-native. The source, licenses and Git history remain available for historical builds and explicit differential benchmarks; archiving does not remove older pinned commits.
+> [!WARNING]
+> **This package is deprecated.** [Lumine](https://github.com/lumine-code/lumine) now uses [fuzzy-search](https://github.com/lumine-code/fuzzy-search), its JavaScript replacement. The native implementation is retained for historical builds and differential benchmarks. This repository is archived and no longer maintained.
 
 ## Features
 
