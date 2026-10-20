@@ -34,7 +34,9 @@ jobs:
         include:
           - os: ubuntu-latest
             node: 24
-          - os: macos-latest
+          # The final archival check uses the available Intel pool; the ARM
+          # job was cancelled before acquisition because of hosted capacity.
+          - os: macos-26-intel
             node: 24
           - os: windows-latest
             node: 24
